@@ -5,6 +5,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { once } from "node:events";
+import { request } from 'node:http';
 import { legalMoves } from "../src/rules.ts";
 test("online rooms, authority, reconnect, chat, economy and ranked settlement", async () => {
   const port = 18879;
@@ -79,6 +80,15 @@ test("online rooms, authority, reconnect, chat, economy and ranked settlement", 
     await call("/chat", b.token, { text: message });
     s = (await call("/state", a.token)).data;
     assert.equal(s.room.chat[0].text, message);
+    const payload = Buffer.from(JSON.stringify({text:'หมากฮอสไทย'}));
+    const splitAt = payload.indexOf(Buffer.from('ห')) + 1;
+    await new Promise<void>((resolve, reject) => {
+      const req=request(`http://127.0.0.1:${port}/api/chat`, {method:'POST',headers:{Authorization:`Bearer ${b.token}`,'Content-Type':'application/json'}},res=>{
+        res.resume();res.on('end',()=>res.statusCode===200?resolve():reject(new Error('split Thai text failed')));
+      });
+      req.on('error', reject);req.write(payload.subarray(0,splitAt));setImmediate(()=>req.end(payload.subarray(splitAt)));
+    });
+    assert.equal((await call('/state',a.token)).data.room.chat.at(-1).text,'หมากฮอสไทย');
     assert.equal(s.room.code, r.code);
     assert.equal((await call("/buy", a.token, { id: "azure" })).status, 400);
     await call("/leave", b.token, {});

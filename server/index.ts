@@ -122,13 +122,15 @@ function snapshot(id: string) {
   };
 }
 async function body(req: IncomingMessage) {
-  let raw = "";
+  const chunks: Buffer[] = [];
+  let size = 0;
   for await (const chunk of req) {
-    raw += chunk;
-    if (raw.length > 8192) throw new Error("ข้อความยาวเกินไป");
+    size += chunk.length;
+    if (size > 8192) throw new Error("ข้อความยาวเกินไป");
+    chunks.push(chunk);
   }
   try {
-    return JSON.parse(raw || "{}");
+    return JSON.parse(Buffer.concat(chunks).toString('utf8') || "{}");
   } catch {
     throw new Error("ข้อมูลไม่ถูกต้อง");
   }
