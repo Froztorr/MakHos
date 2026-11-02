@@ -30,6 +30,7 @@ let game: Neo = createNeo(
   selected: number | null = null,
   skill = false,
   busy = false,
+  turnPhase: "idle" | "player-moving" | "bot-thinking" | "bot-moving" = "idle",
   combatFx: { fromR: number; fromC: number; toR: number; toC: number; victim: string; attackerSide: 1 | -1; victimSide: 1 | -1; killed: boolean } | null = null,
   awarded = false,
   resultPending = false,
@@ -110,6 +111,7 @@ function restart() {
   selected = null;
   skill = false;
   busy = false;
+  turnPhase = "idle";
   combatFx = null;
   awarded = false;
   log = [];
@@ -231,9 +233,11 @@ function render() {
   $("#own-count").textContent =
     `${game.units.filter((x) => x.side === 1).length} ตัว`;
   $("#message").textContent = busy
-    ? game.turn === -1
-      ? "แม่ทัพทองกำลังคิด..."
-      : "แม่ทัพทองกำลังเดิน..."
+    ? turnPhase === "player-moving"
+      ? "กำลังเดินตาของคุณ..."
+      : turnPhase === "bot-thinking"
+        ? "ตาแม่ทัพทอง · กำลังเลือกเดิน..."
+        : "ตาแม่ทัพทอง · กำลังเดิน..."
     : skill
       ? "เลือกเป้าหมายสกิลบนกระดาน"
       : game.log;
@@ -329,68 +333,67 @@ async function perform(action: Action) {
     };
   }
   busy = true;
+  turnPhase = "player-moving";
   render();
   const mark = revision;
-  void waitForTurnAnimation().then(() => {
-    if (mark !== revision) return;
-    combatFx = null;
+  await waitForTurnAnimation();
+  if (mark !== revision) return;
+  combatFx = null;
+  if (game.winner !== null || game.turn !== -1) {
     busy = false;
+    turnPhase = "idle";
     render();
-    queueBot();
-  });
+    return;
+  }
+  turnPhase = "bot-thinking";
+  render();
+  try {
+    const a = botAction(game);
+    if (!a) {
+      game.log = "แม่ทัพทองไม่มีตาเดิน · คุณชนะแล้ว";
+      game.winner = 1;
+      busy = false;
+      turnPhase = "idle";
+      render();
+      return;
+    }
+    const attacker = game.units.find((x) => x.id === a.id)!;
+    const target = a.target === undefined ? undefined : game.units.find((x) => x.id === a.target);
+    game = applyNeo(game, a);
+    log.push(game.log);
+    if (target && target.side !== attacker.side) {
+      combatFx = {
+        fromR: attacker.r,
+        fromC: attacker.c,
+        toR: target.r,
+        toC: target.c,
+        victim: symbols[target.role],
+        attackerSide: attacker.side,
+        victimSide: target.side,
+        killed: !game.units.some((x) => x.id === target.id),
+      };
+    }
+  } catch (error) {
+    console.error("Neo bot turn failed", error);
+    game.log = "แม่ทัพทองขัดข้อง · แตะเริ่มเกมใหม่เพื่อลองอีกครั้ง";
+    busy = false;
+    turnPhase = "idle";
+    render();
+    return;
+  }
+  turnPhase = "bot-moving";
+  render();
+  await waitForTurnAnimation();
+  if (mark !== revision) return;
+  combatFx = null;
+  busy = false;
+  turnPhase = "idle";
+  render();
 }
 function waitForTurnAnimation() {
   if (boardScene) return boardScene.waitForIdle();
   if (!combatFx) return Promise.resolve();
   return new Promise<void>((resolve) => setTimeout(resolve, 440));
-}
-function queueBot() {
-  if (game.winner !== null || game.turn !== -1) return;
-  busy = true;
-  render();
-  const mark = revision;
-  void waitForTurnAnimation().then(() => {
-    if (mark !== revision) return;
-    try {
-      const a = botAction(game);
-      if (!a) {
-        game.log = "แม่ทัพทองไม่มีตาเดิน · คุณชนะแล้ว";
-        game.winner = 1;
-        busy = false;
-        render();
-        return;
-      }
-      const attacker = game.units.find((x) => x.id === a.id)!;
-      const target = a.target === undefined ? undefined : game.units.find((x) => x.id === a.target);
-      game = applyNeo(game, a);
-      log.push(game.log);
-      if (target && target.side !== attacker.side) {
-        combatFx = {
-          fromR: attacker.r,
-          fromC: attacker.c,
-          toR: target.r,
-          toC: target.c,
-          victim: symbols[target.role],
-          attackerSide: attacker.side,
-          victimSide: target.side,
-          killed: !game.units.some((x) => x.id === target.id),
-        };
-      }
-    } catch (error) {
-      console.error("Neo bot turn failed", error);
-      game.log = "แม่ทัพทองขัดข้อง · แตะเริ่มเกมใหม่เพื่อลองอีกครั้ง";
-      busy = false;
-      render();
-      return;
-    }
-    render();
-    void waitForTurnAnimation().then(() => {
-      if (mark !== revision) return;
-      combatFx = null;
-      busy = false;
-      render();
-    });
-  });
 }
 window.addEventListener("resize", () => render());
 render();
