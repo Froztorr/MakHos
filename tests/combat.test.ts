@@ -31,8 +31,10 @@ test("capture holds victim until impact, splits it, then disposes it and restore
     assert(!victim.isDisposed());
     assert(!animation.impacted);
     assert(!actor.position.equals(to));
-    animation.advance(0.4);
+    animation.advance(0.15);
     assert(animation.impacted);
+    assert(actor.getChildTransformNodes().find(n=>n.name==='sword-arm')!.rotation.x < 1.2,
+      'victim breaks while the sword is still swinging');
     assert(
       victim.getChildTransformNodes().find((n) => n.name === "upper-half")!
         .rotation.z < 0,

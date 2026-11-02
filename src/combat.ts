@@ -3,7 +3,7 @@ import { TransformNode } from "@babylonjs/core/Meshes/transformNode.js";
 import { Vector3 } from "@babylonjs/core/Maths/math.vector.js";
 import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder.js";
 import type { StandardMaterial } from "@babylonjs/core/Materials/standardMaterial.js";
-export const CAPTURE_SECONDS = 1.3;
+export const CAPTURE_SECONDS = 0.88;
 const clamp = (v: number) => Math.max(0, Math.min(1, v));
 const ease = (v: number) => {
   v = clamp(v);
@@ -78,12 +78,14 @@ export class CaptureAnimation {
         Vector3.Lerp(this.from, this.approach, ease(t / 0.36)),
       );
       this.arm.rotation.x = -ease(t / 0.36) * 1.9;
-    } else if (t < 0.58) {
-      this.actor.position.copyFrom(this.approach);
-      this.arm.rotation.x = -1.9 + ease((t - 0.36) / 0.22) * 3.1;
     } else {
+      this.actor.position.copyFrom(this.approach);
+      this.arm.rotation.x = -1.9 + ease((t - 0.36) / 0.14) * 3.1;
+    }
+    // Break on contact, during the swing, rather than waiting for its follow-through.
+    if (t >= 0.43) {
       this.impacted = true;
-      const split = clamp((t - 0.58) / 0.55);
+      const split = clamp((t - 0.43) / 0.28);
       this.upper.position.x = split * 0.65;
       this.upper.position.y =
         0.49 + Math.sin(split * Math.PI) * 0.28 - split * 0.18;
@@ -91,12 +93,12 @@ export class CaptureAnimation {
       this.upper.rotation.x = split * 0.35;
       this.lower.position.x = -split * 0.22;
       this.lower.rotation.z = split * 0.45;
-      this.flash.visibility = Math.max(0, 1 - (t - 0.58) / 0.26);
+      this.flash.visibility = Math.max(0, 1 - (t - 0.43) / 0.18);
       this.flash.scaling.setAll(1 + split * 0.6);
       for (const m of this.victim.getChildMeshes())
-        m.visibility = 1 - clamp((t - 0.95) / 0.3);
-      this.arm.rotation.x = 1.2 * (1 - ease((t - 0.7) / 0.4));
-      const travel = ease((t - 0.78) / 0.52);
+        m.visibility = 1 - clamp((t - 0.6) / 0.22);
+      if (t >= 0.5) this.arm.rotation.x = 1.2 * (1 - ease((t - 0.5) / 0.28));
+      const travel = ease((t - 0.48) / 0.4);
       this.actor.position.copyFrom(
         Vector3.Lerp(this.approach, this.to, travel),
       );
