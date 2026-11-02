@@ -1244,4 +1244,103 @@ dialog::backdrop {
 .stage strong {
   font-size: 14px;
 }
-@media(max-width:1100px){body.device-landscape .arena{grid-template-rows:44px 45px 45px 30px auto}body.device-landscape .board-wrap{grid-row:2/6;max-height:calc(100svh - 140px);min-height:180px;align-self:center}body.device-landscape .player-strip{min-height:0;padding:0;gap:4px}body.device-landscape .player-strip strong{font-size:11px}body.device-landscape .avatar{height:30px;width:30px;font-size:22px}body.device-landscape .board-actions button{min-height:30px;padding:2px 6px}body.device-landscape .game-status{line-height:1.4}body.device-landscape .self .turn-badge{display:none}}
+@media (max-width: 1100px) {
+  body.device-landscape .arena {
+    grid-template-rows: 44px 45px 45px 30px auto;
+  }
+  body.device-landscape .board-wrap {
+    grid-row: 2/6;
+    max-height: calc(100svh - 140px);
+    min-height: 180px;
+    align-self: center;
+  }
+  body.device-landscape .player-strip {
+    min-height: 0;
+    padding: 0;
+    gap: 4px;
+  }
+  body.device-landscape .player-strip strong {
+    font-size: 11px;
+  }
+  body.device-landscape .avatar {
+    height: 30px;
+    width: 30px;
+    font-size: 22px;
+  }
+  body.device-landscape .board-actions button {
+    min-height: 30px;
+    padding: 2px 6px;
+  }
+  body.device-landscape .game-status {
+    line-height: 1.4;
+  }
+  body.device-landscape .self .turn-badge {
+    display: none;
+  }
+}
+.showroom {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 32px 20px;
+  text-align: center;
+}
+.showroom h1 {
+  font-family: "Noto Serif Thai", serif;
+  font-size: 34px;
+  margin: 12px 0 8px;
+}
+.showroom p {
+  color: #7b8977;
+  line-height: 1.8;
+  font-size: 15px;
+}
+.showroom-canvas {
+  height: min(62vh, 620px);
+  min-height: 300px;
+  max-width: 900px;
+  margin: auto;
+  background: radial-gradient(ellipse, #e0e7d7, transparent 70%);
+}
+#showcase {
+  width: 100%;
+  height: 100%;
+  display: block;
+  touch-action: none;
+}
+.showroom-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.preview-reduced {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 18px 0;
+  font-size: 14px;
+}
+.preview-reduced input {
+  height: 20px;
+  width: 20px;
+  accent-color: #315e4e;
+}
+.showroom > a {
+  display: inline-block;
+  margin-top: 20px;
+}
+@media (max-width: 600px) {
+  .showroom {
+    padding: 20px 12px;
+  }
+  .showroom h1 {
+    font-size: 27px;
+  }
+  .showroom-canvas {
+    height: 50vh;
+  }
+  .showroom-actions button {
+    font-size: 14px;
+  }
+}

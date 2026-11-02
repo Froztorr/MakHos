@@ -264,7 +264,10 @@ function render() {
   stageList();
   if (game.winner !== null && !resultShown) {
     resultShown = true;
-    finish();
+    const expected = revision;
+    (scene?.waitForIdle() ?? Promise.resolve()).then(() => {
+      if (expected === revision) finish();
+    });
   }
 }
 function renderFlat() {
@@ -294,6 +297,7 @@ function pick(r: number, c: number) {
   if (
     game.winner !== null ||
     networkBusy ||
+    scene?.busy ||
     (mode !== "local" && game.turn !== mySide()) ||
     (mode === "online" && online?.room?.players.length !== 2)
   )
@@ -342,7 +346,9 @@ async function play(move: Move) {
   revision++;
   selected = game.forced;
   render();
-  scheduleBot();
+  const expected = revision;
+  await scene?.waitForIdle();
+  if (expected === revision) scheduleBot();
 }
 function scheduleBot() {
   if (
@@ -489,7 +495,7 @@ function showShop() {
   const p = activeProfile();
   modal(
     "โรงแต่งตัว",
-    `<p>ของตกแต่งล้วน ๆ ไม่มีเพิ่มพลัง · ${mode === "online" ? "กระเป๋าออนไลน์" : "กระเป๋าผจญภัยในเครื่อง"} <b>◈ ${p.coins}</b></p><div class="shop-grid">${catalog.map((item) => `<button class="shop-item ${p[item.kind] === item.id ? "equipped" : ""}" data-buy="${item.id}"><span class="item-art" style="--item-color:${item.color}">${icon(item.icon)}</span><strong>${item.name}</strong><small>${item.desc}</small><b>${p[item.kind] === item.id ? "✓ ใช้อยู่" : p.owned.includes(item.id) ? "เลือกใช้" : `◈ ${item.price}`}</b></button>`).join("")}</div>`,
+    `<p>ของตกแต่งล้วน ๆ ไม่มีเพิ่มพลัง · ${mode === "online" ? "กระเป๋าออนไลน์" : "กระเป๋าผจญภัยในเครื่อง"} <b>◈ ${p.coins}</b></p><a class="soft-button" style="display:inline-block;margin-bottom:18px" href="./preview.html" target="_blank" rel="noopener">⚔ ดูแม่ทัพและลองท่าดาบ</a><div class="shop-grid">${catalog.map((item) => `<button class="shop-item ${p[item.kind] === item.id ? "equipped" : ""}" data-buy="${item.id}"><span class="item-art" style="--item-color:${item.color}">${icon(item.icon)}</span><strong>${item.name}</strong><small>${item.desc}</small><b>${p[item.kind] === item.id ? "✓ ใช้อยู่" : p.owned.includes(item.id) ? "เลือกใช้" : `◈ ${item.price}`}</b></button>`).join("")}</div>`,
   );
   document.querySelectorAll<HTMLButtonElement>("[data-buy]").forEach(
     (b) =>

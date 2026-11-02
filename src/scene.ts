@@ -16,6 +16,8 @@ import "@babylonjs/core/Shaders/shadowMap.vertex";
 import "@babylonjs/core/Shaders/shadowMap.fragment";
 import "@babylonjs/core/Culling/ray";
 import type { Game, Move } from "./rules.ts";
+import { createSoldier } from "./soldier.ts";
+import { CaptureAnimation } from "./combat.ts";
 export class BoardScene {
   engine: Engine;
   scene: Scene;
@@ -32,7 +34,7 @@ export class BoardScene {
   private shadow: ShadowGenerator;
   private materials = new Map<string, StandardMaterial>();
   private terrain: Mesh[] = [];
-  private bursts: { mesh: Mesh; life: number }[] = [];
+  private combat: CaptureAnimation | null = null;
   constructor(
     public canvas: HTMLCanvasElement,
     public onPick: (r: number, c: number) => void,
@@ -126,7 +128,10 @@ export class BoardScene {
     this.engine.runRenderLoop(() => {
       const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.05);
       this.elapsed += dt;
+      if (this.reduced) this.combat?.finish();
+      this.combat?.advance(dt);
       for (const [id, root] of this.roots) {
+        if (this.busy && this.combat?.actor === root) continue;
         const p = this.game?.pieces.find((p) => p.id === id);
         if (!p) continue;
         const target = new Vector3(p.c - 3.5, 0.13, 3.5 - p.r);
@@ -154,17 +159,6 @@ export class BoardScene {
               : Math.min(remaining, 0.25) * (this.effect === "bloom" ? -1 : 1);
         }
       }
-      this.bursts = this.bursts.filter((b) => {
-        b.life -= dt;
-        b.mesh.scaling.scaleInPlace(1 + dt * 4);
-        b.mesh.position.y += dt * 1.4;
-        b.mesh.visibility = Math.max(0, b.life * 2);
-        if (b.life <= 0) {
-          b.mesh.dispose();
-          return false;
-        }
-        return true;
-      });
       this.scene.render();
     });
   }
@@ -198,91 +192,17 @@ export class BoardScene {
     return m;
   }
   private soldier(id: number, side: number, king: boolean, skin: string) {
-    const root = new TransformNode("soldier" + id, this.scene);
-    const body = new TransformNode("body", this.scene);
-    body.parent = root;
-    const uniform =
-      skin === "rose"
-        ? "#c37787"
-        : skin === "azure"
-          ? "#5998bc"
-          : side === 1
-            ? "#4f8d78"
-            : "#dba65d";
-    const ball = (
-      name: string,
-      size: number,
-      x: number,
-      y: number,
-      z: number,
-      color: string,
-      scale = [1, 1, 1],
-    ) => {
-      const m = MeshBuilder.CreateSphere(
-        name,
-        { diameter: size, segments: 12 },
-        this.scene,
-      );
-      m.position.set(x, y, z);
-      m.scaling.set(...(scale as [number, number, number]));
-      m.material = this.mat(color);
-      m.parent = body;
-      return m;
-    };
-    const base = MeshBuilder.CreateCylinder(
-      "base",
-      { diameter: king ? 0.79 : 0.69, height: 0.12, tessellation: 32 },
-      this.scene,
+    const root = createSoldier(this.scene, id, side, king, skin, (color) =>
+      this.mat(color),
     );
-    base.parent = body;
-    base.material = this.mat(side === 1 ? "#244c43" : "#8d6032");
-    base.position.y = 0.06;
-    ball("coat", 0.57, 0, 0.39, 0, uniform, [0.95, 1.15, 0.8]);
-    ball("face", 0.43, 0, 0.75, -0.03, "#ffe0b6");
-    ball("helmet", 0.51, 0, 0.89, 0.015, uniform, [1, 0.6, 1]);
-    ball("left eye", 0.055, -0.09, 0.76, -0.23, "#293b35");
-    ball("right eye", 0.055, 0.09, 0.76, -0.23, "#293b35");
-    ball("nose", 0.07, 0, 0.7, -0.25, "#e8b086");
-    for (const x of [-0.23, 0.23]) {
-      ball("arm", 0.19, x, 0.43, 0, uniform, [0.8, 1.5, 0.9]);
-      ball("boot", 0.19, x * 0.5, 0.16, -0.08, "#33453f", [0.8, 0.8, 1.35]);
-    }
-    ball("button", 0.055, 0, 0.46, -0.235, "#ffe0a0");
-    const plume = ball(
-      "plume",
-      0.17,
-      0,
-      1.08,
-      0.02,
-      side === 1 ? "#f0ca76" : "#9a5e42",
-      [0.7, 1.7, 0.8],
-    );
-    if (king) {
-      root.scaling.setAll(1.13);
-      plume.material = this.mat("#ffdf81");
-      for (let i = 0; i < 5; i++) {
-        const crown = MeshBuilder.CreateCylinder(
-          "crown",
-          {
-            diameterTop: 0,
-            diameterBottom: 0.13,
-            height: 0.27,
-            tessellation: 4,
-          },
-          this.scene,
-        );
-        crown.position.set(
-          Math.cos((i * Math.PI * 2) / 5) * 0.2,
-          1.03,
-          Math.sin((i * Math.PI * 2) / 5) * 0.2,
-        );
-        crown.material = this.mat("#ffe093");
-        crown.parent = body;
-      }
-    }
-    root.rotation.y = side === 1 ? Math.PI : 0;
-    for (const m of root.getChildMeshes()) this.shadow.addShadowCaster(m);
+    for (const mesh of root.getChildMeshes()) this.shadow.addShadowCaster(mesh);
     return root;
+  }
+  get busy() {
+    return !!this.combat && !this.combat.finished;
+  }
+  waitForIdle() {
+    return this.combat?.done ?? Promise.resolve();
   }
   update(
     game: Game,
@@ -295,6 +215,26 @@ export class BoardScene {
     other = { skin: "jade", board: "forest", effect: "spark" },
   ) {
     const old = this.game;
+    const changed =
+      !!old && JSON.stringify(old.pieces) !== JSON.stringify(game.pieces);
+    const outfitChanged = game.pieces.some((p) => {
+      const root = this.roots.get(p.id);
+      return (
+        root && root.metadata?.skin !== (p.side === ownSide ? skin : other.skin)
+      );
+    });
+    if (changed || this.reduced || outfitChanged) {
+      this.combat?.finish();
+      this.combat = null;
+    }
+    const captured = game.last?.capture;
+    const victim =
+      changed &&
+      !this.reduced &&
+      captured !== undefined &&
+      !game.pieces.some((p) => p.id === captured)
+        ? this.roots.get(captured)
+        : undefined;
     this.game = game;
     this.selected = selected;
     this.effect = effect;
@@ -306,21 +246,7 @@ export class BoardScene {
         p.king !== prev?.king ||
         root.metadata?.skin !== (p?.side === ownSide ? skin : other.skin)
       ) {
-        if (!p && !this.reduced) {
-          const burst = MeshBuilder.CreateSphere(
-            "poof",
-            {
-              diameter: effect === "bloom" ? 0.8 : 0.4,
-              segments: effect === "bloom" ? 12 : 4,
-            },
-            this.scene,
-          );
-          burst.position.copyFrom(root.position);
-          burst.position.y = 0.7;
-          burst.material = this.mat(effect === "bloom" ? "#f5b3c5" : "#ffda86");
-          this.bursts.push({ mesh: burst, life: 0.5 });
-        }
-        root.dispose();
+        if (root !== victim) root.dispose();
         this.roots.delete(id);
       }
     }
@@ -335,6 +261,21 @@ export class BoardScene {
       }
       for (const child of root.getChildMeshes())
         child.metadata = { r: p.r, c: p.c };
+    }
+    if (victim && game.last) {
+      const actor = this.roots.get(game.last.id),
+        previous = old?.pieces.find((p) => p.id === game.last!.id);
+      if (actor && previous) {
+        const actorEffect = previous.side === ownSide ? effect : other.effect;
+        this.combat = new CaptureAnimation(
+          actor,
+          victim,
+          new Vector3(previous.c - 3.5, 0.13, 3.5 - previous.r),
+          new Vector3(game.last.c - 3.5, 0.13, 3.5 - game.last.r),
+          this.scene,
+          this.mat(actorEffect === "bloom" ? "#f5b3c5" : "#fff0b8"),
+        );
+      } else victim.dispose();
     }
     for (const m of this.markers) m.dispose();
     this.markers = [];
