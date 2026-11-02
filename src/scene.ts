@@ -109,11 +109,17 @@ export class BoardScene {
         leaf.material = this.mat(i % 2 ? "#61885c" : "#36634e");
       }
     }
+    let pointerStart: { x: number; y: number; id: number } | null = null;
     this.scene.onPointerObservable.add((info) => {
-      if (info.type === 1) {
-        const meta = info.pickInfo?.pickedMesh?.metadata;
-        if (meta && Number.isInteger(meta.r)) this.onPick(meta.r, meta.c);
-      }
+      const event = info.event as PointerEvent;
+      if (info.type === 1 && event.isPrimary && event.button === 0)
+        pointerStart = { x: event.clientX, y: event.clientY, id: event.pointerId };
+      if (info.type !== 2) return;
+      const start = pointerStart;
+      pointerStart = null;
+      if (!start || start.id !== event.pointerId || Math.hypot(event.clientX - start.x, event.clientY - start.y) > 12) return;
+      const meta = info.pickInfo?.pickedMesh?.metadata;
+      if (meta && Number.isInteger(meta.r) && Number.isInteger(meta.c)) this.onPick(meta.r, meta.c);
     });
     const resize = () => {
       if (!canvas.clientWidth || !canvas.clientHeight) return;
@@ -134,12 +140,18 @@ export class BoardScene {
       this.combat?.advance(dt * (this.reduced ? 2 : 1));
       for (const [id, root] of this.roots) {
         if (
-          this.busy &&
+          this.combat && !this.combat.finished &&
           (this.combat?.actor === root || this.combat?.victim === root)
         )
           continue;
         const p = this.game?.pieces.find((p) => p.id === id);
         if (!p) continue;
+        const visual = root.metadata?.neoVisual;
+        if (visual?.fire) visual.fire.forEach((flame: Mesh, i: number) => {
+          const pulse = 0.8 + 0.2 * Math.sin(this.elapsed * 9 + i * 2);
+          flame.scaling.set(pulse, 0.8 + 0.35 * Math.sin(this.elapsed * 11 + i), pulse);
+        });
+        if (visual?.aura) visual.aura.scaling.setAll(1 + 0.15 * Math.sin(this.elapsed * 4));
         const target = new Vector3(p.c - 3.5, 0.13, 3.5 - p.r);
         const remaining = Vector3.Distance(root.position, target);
         root.position = Vector3.Lerp(
@@ -259,11 +271,49 @@ export class BoardScene {
     for (const unit of units) {
       const root = this.roots.get(unit.id);
       if (!root) continue;
+      const visual = root.metadata.neoVisual ?? (root.metadata.neoVisual = {});
+      const arm = root.getChildTransformNodes().find((node) => node.name === "sword-arm");
+      if (unit.buffHits > 0 && arm && !visual.fire) {
+        visual.fire = [0, 1, 2].map((i) => {
+          const flame = MeshBuilder.CreateSphere("buff flame", { diameter: 0.18, segments: 8 }, this.scene);
+          flame.parent = arm;
+          flame.position.set((i - 1) * 0.07, 0.28 + i * 0.13, -0.06);
+          flame.material = this.mat(i === 1 ? "#ffe14d" : "#ff681d");
+          (flame.material as StandardMaterial).emissiveColor = Color3.FromHexString(i === 1 ? "#ffb52e" : "#ef450b");
+          flame.isPickable = false;
+          return flame;
+        });
+      } else if (unit.buffHits <= 0 && visual.fire) {
+        visual.fire.forEach((flame: Mesh) => flame.dispose());
+        delete visual.fire;
+      }
+      if (unit.guard && !visual.aura) {
+        const aura = MeshBuilder.CreateTorus("shield aura", { diameter: 0.9, thickness: 0.075, tessellation: 32 }, this.scene);
+        aura.parent = root;
+        aura.position.set(0.31, 0.72, -0.3);
+        aura.rotation.x = Math.PI / 2;
+        const material = this.mat("#4ccfff");
+        material.emissiveColor = Color3.FromHexString("#228fdb");
+        aura.material = material;
+        aura.isPickable = false;
+        visual.aura = aura;
+      } else if (!unit.guard && visual.aura) {
+        visual.aura.dispose();
+        delete visual.aura;
+      }
       for (const mesh of root.getChildMeshes()) {
+        if (mesh === visual.aura || visual.fire?.includes(mesh)) continue;
         const weapon = /sword|blade|dagger|mage staff|mage orb/i.test(mesh.name);
         const shield = /shield/i.test(mesh.name);
         const active = (weapon && unit.buffHits > 0) || (shield && unit.guard);
         const metadata = mesh.metadata ?? (mesh.metadata = {});
+        if (shield && unit.guard && !metadata.neoScale) {
+          metadata.neoScale = mesh.scaling.clone();
+          mesh.scaling.scaleInPlace(1.35);
+        } else if (shield && !unit.guard && metadata.neoScale) {
+          mesh.scaling.copyFrom(metadata.neoScale);
+          delete metadata.neoScale;
+        }
         if (active && !metadata.neoGlow && mesh.material instanceof StandardMaterial) {
           const original = mesh.material;
           const glow = original.clone(`${mesh.name}-neo-glow`);

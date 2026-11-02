@@ -43,21 +43,6 @@ try {
     $("#board") as HTMLCanvasElement,
     (r, c) => pick(r, c),
   );
-  const canvas = $("#board") as HTMLCanvasElement;
-  canvas.addEventListener("pointerup", (event) => {
-    if (!boardScene) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) * boardScene.engine.getRenderWidth()) / rect.width;
-    const y = ((event.clientY - rect.top) * boardScene.engine.getRenderHeight()) / rect.height;
-    const hit = boardScene.scene.pick(
-      x,
-      y,
-      (mesh) => Number.isInteger(mesh.metadata?.r) && Number.isInteger(mesh.metadata?.c),
-    );
-    const square = hit?.pickedMesh?.metadata;
-    if (hit?.hit && Number.isInteger(square?.r) && Number.isInteger(square?.c))
-      pick(square.r, square.c);
-  });
 } catch {
   $("#board").setAttribute("hidden", "");
   $("#flat-board").removeAttribute("hidden");
