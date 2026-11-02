@@ -201,6 +201,7 @@ main {
   color: #f6daa0;
 }
 .board-frame {
+  position: relative;
   padding: 9px;
   background: #765536;
   border: 3px solid #d5ad69;
@@ -208,6 +209,32 @@ main {
   box-shadow:
     0 10px 0 #483525,
     0 18px 35px #07100a90;
+}
+#skill-float {
+  position: absolute;
+  z-index: 8;
+  transform: translate(-50%, -115%);
+  pointer-events: none;
+}
+#skill-float[hidden] {
+  display: none;
+}
+#skill-top {
+  min-height: 38px;
+  padding: 5px 12px;
+  border: 1px solid #fff2c2;
+  border-radius: 999px;
+  color: #263d32;
+  background: linear-gradient(145deg, #fff2bd, #e0bd6c);
+  box-shadow: 0 3px 12px #091610aa, inset 0 1px #fff9;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: auto;
+  animation: skill-float 1.8s ease-in-out infinite;
+}
+@keyframes skill-float {
+  50% { transform: translateY(-3px); }
 }
 #board {
   display: block;
@@ -672,6 +699,7 @@ dialog p {
   .event { margin-top: 10px; padding-top: 8px; }
   .event p { margin: 3px 0; padding: 3px 0; }
 }
+
 
 
 

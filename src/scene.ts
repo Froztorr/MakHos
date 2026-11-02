@@ -1,7 +1,7 @@
 import { Engine } from "@babylonjs/core/Engines/engine";
 import { Scene } from "@babylonjs/core/scene";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
-import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Matrix, Vector3 } from "@babylonjs/core/Maths/math.vector";
 import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
 import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
 import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
@@ -15,7 +15,7 @@ import "@babylonjs/core/Shaders/depthBoxBlur.fragment";
 import "@babylonjs/core/Shaders/shadowMap.vertex";
 import "@babylonjs/core/Shaders/shadowMap.fragment";
 import "@babylonjs/core/Culling/ray";
-import type { Game, Move } from "./rules.ts";
+import type { Game, Move, Piece } from "./rules.ts";
 import { createSoldier } from "./soldier.ts";
 import { CaptureAnimation } from "./combat.ts";
 export class BoardScene {
@@ -202,9 +202,10 @@ export class BoardScene {
     m.material = this.mat(color);
     return m;
   }
-  private soldier(id: number, side: number, king: boolean, skin: string) {
+  private soldier(id: number, side: number, king: boolean, skin: string, role?: string) {
     const root = createSoldier(this.scene, id, side, king, skin, (color) =>
       this.mat(color),
+      role,
     );
     for (const mesh of root.getChildMeshes()) this.shadow.addShadowCaster(mesh);
     return root;
@@ -215,6 +216,23 @@ export class BoardScene {
   waitForIdle() {
     return this.combat?.done ?? Promise.resolve();
   }
+  projectPiece(id: number) {
+    const p = this.game?.pieces.find((piece) => piece.id === id);
+    if (!p || !this.canvas.clientWidth || !this.engine.getRenderWidth())
+      return null;
+    const width = this.engine.getRenderWidth();
+    const height = this.engine.getRenderHeight();
+    const point = Vector3.Project(
+      new Vector3(p.c - 3.5, 1.7, 3.5 - p.r),
+      Matrix.Identity(),
+      this.scene.getTransformMatrix(),
+      this.camera.viewport.toGlobal(width, height),
+    );
+    return {
+      x: this.canvas.offsetLeft + (point.x * this.canvas.clientWidth) / width,
+      y: this.canvas.offsetTop + (point.y * this.canvas.clientHeight) / height,
+    };
+  }
   update(
     game: Game,
     selected: number | null,
@@ -224,6 +242,7 @@ export class BoardScene {
     effect = "spark",
     ownSide = 1,
     other = { skin: "jade", board: "forest", effect: "spark" },
+    roleFor?: (piece: Piece) => string | undefined,
   ) {
     const old = this.game;
     const changed =
@@ -233,7 +252,9 @@ export class BoardScene {
     const outfitChanged = game.pieces.some((p) => {
       const root = this.roots.get(p.id);
       return (
-        root && root.metadata?.skin !== (p.side === ownSide ? skin : other.skin)
+        root &&
+        (root.metadata?.skin !== (p.side === ownSide ? skin : other.skin) ||
+          root.metadata?.role !== roleFor?.(p))
       );
     });
     if (changed || outfitChanged) {
@@ -258,7 +279,8 @@ export class BoardScene {
       if (
         !p ||
         p.king !== prev?.king ||
-        root.metadata?.skin !== (p?.side === ownSide ? skin : other.skin)
+        root.metadata?.skin !== (p?.side === ownSide ? skin : other.skin) ||
+        root.metadata?.role !== (p ? roleFor?.(p) : undefined)
       ) {
         if (root !== victim) root.dispose();
         this.roots.delete(id);
@@ -268,8 +290,9 @@ export class BoardScene {
       let root = this.roots.get(p.id);
       if (!root) {
         const outfit = p.side === ownSide ? skin : other.skin;
-        root = this.soldier(p.id, p.side, p.king, outfit);
-        root.metadata = { skin: outfit };
+        const role = roleFor?.(p);
+        root = this.soldier(p.id, p.side, p.king, outfit, role);
+        root.metadata = { skin: outfit, role };
         root.position.set(p.c - 3.5, 0.13, 3.5 - p.r);
         this.roots.set(p.id, root);
       }
@@ -356,5 +379,6 @@ export class BoardScene {
     }
   }
 }
+
 
 

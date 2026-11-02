@@ -11,6 +11,7 @@ export function createSoldier(
   king: boolean,
   skin: string,
   mat: (color: string) => StandardMaterial,
+  role?: string,
 ) {
   const root = new TransformNode("soldier" + id, scene);
   const body = new TransformNode("body", scene);
@@ -197,26 +198,79 @@ export function createSoldier(
     mesh.material = mat(color);
     return mesh;
   };
-  weapon("sword grip", 0, -0.02, -0.06, 0.07, 0.2, 0.07, dark);
-  weapon("sword guard", 0, 0.09, -0.06, 0.27, 0.045, 0.08, gold);
-  weapon("sword blade", 0, 0.31, -0.06, king ? 0.1 : 0.075, 0.4, 0.035, metal);
-  weapon("blade ridge", 0, 0.31, -0.082, 0.018, 0.4, 0.012, "#f5f2da");
-  const tip = MeshBuilder.CreateCylinder(
-    "sword point",
-    {
-      diameterTop: 0,
-      diameterBottom: king ? 0.14 : 0.105,
-      height: 0.13,
-      tessellation: 4,
-    },
-    scene,
-  );
-  tip.parent = arm;
-  tip.position.set(0, 0.575, -0.06);
-  tip.scaling.z = 0.3;
-  tip.material = mat(metal);
+  if (role === "mage") {
+    const staff = MeshBuilder.CreateCylinder(
+      "mage staff",
+      { diameterTop: 0.045, diameterBottom: 0.075, height: 0.63, tessellation: 10 },
+      scene,
+    );
+    staff.parent = arm;
+    staff.position.set(0, 0.25, -0.06);
+    staff.material = mat(gold);
+    const orb = MeshBuilder.CreateSphere(
+      "mage orb",
+      { diameter: 0.22, segments: 12 },
+      scene,
+    );
+    orb.parent = arm;
+    orb.position.set(0, 0.58, -0.06);
+    orb.material = mat("#c5a4ff");
+    const brim = MeshBuilder.CreateCylinder(
+      "mage hat brim",
+      { diameterTop: 0.49, diameterBottom: 0.58, height: 0.06, tessellation: 20 },
+      scene,
+    );
+    brim.position.set(0, 0.72, 0.02);
+    brim.parent = upper;
+    brim.material = mat("#7456a3");
+    const cone = MeshBuilder.CreateCylinder(
+      "mage pointed hat",
+      { diameterTop: 0.025, diameterBottom: 0.38, height: 0.4, tessellation: 20 },
+      scene,
+    );
+    cone.position.set(0, 0.94, 0.02);
+    cone.parent = upper;
+    cone.material = mat("#604587");
+    ball("mage hat star", 0.09, 0.02, 1.22, -0.13, gold, [1, 1, 0.5]);
+  } else {
+    const bladeLength = role === "rogue" ? 0.25 : 0.4;
+    weapon("sword grip", 0, -0.02, -0.06, 0.07, 0.2, 0.07, dark);
+    weapon("sword guard", 0, 0.09, -0.06, 0.27, 0.045, 0.08, gold);
+    weapon("sword blade", 0, 0.22 + bladeLength / 2, -0.06, role === "warrior" ? 0.105 : 0.075, bladeLength, 0.035, metal);
+    weapon("blade ridge", 0, 0.22 + bladeLength / 2, -0.082, 0.018, bladeLength, 0.012, "#f5f2da");
+    const tip = MeshBuilder.CreateCylinder(
+      "sword point",
+      {
+        diameterTop: 0,
+        diameterBottom: role === "warrior" || king ? 0.14 : 0.1,
+        height: 0.13,
+        tessellation: 4,
+      },
+      scene,
+    );
+    tip.parent = arm;
+    tip.position.set(0, 0.22 + bladeLength + 0.06, -0.06);
+    tip.scaling.z = 0.3;
+    tip.material = mat(metal);
+  }
   const glove = ball("sword hand", 0.12, 0, 0, 0, "#f4d3aa", [1, 1, 1], arm);
   glove.position.set(0, -0.06, -0.06);
+  if (role === "rogue") {
+    ball("rogue hood", 0.54, 0, 1.04, 0.09, dark, [1, 0.9, 1], upper);
+    box("rogue face wrap", 0, 0.83, -0.245, 0.29, 0.1, 0.035, dark, upper);
+    const daggerArm = new TransformNode("offhand-dagger", scene);
+    daggerArm.parent = upper;
+    daggerArm.position.set(0.29, 0.1, -0.02);
+    const dagger = MeshBuilder.CreateBox(
+      "rogue offhand blade",
+      { width: 0.055, height: 0.29, depth: 0.028 },
+      scene,
+    );
+    dagger.parent = daggerArm;
+    dagger.position.set(0, 0.22, -0.04);
+    dagger.material = mat(metal);
+    daggerArm.rotation.z = -0.3;
+  }
   if (king) {
     // A rounded coronet and broad swept crest replace the former pointed spikes.
     const band = MeshBuilder.CreateTorus(
@@ -301,6 +355,28 @@ export function createSoldier(
   } else {
     ball("helmet button", 0.11, 0, 1.17, 0.02, gold, [0.8, 0.7, 0.8]);
   }
+  if (role === "paladin" && !king) {
+    const shield = ball(
+      "paladin shield",
+      0.42,
+      0.31,
+      0.54,
+      -0.12,
+      dark,
+      [0.8, 1.1, 0.27],
+      upper,
+    );
+    shield.rotation.y = -0.2;
+    const rim = MeshBuilder.CreateTorus(
+      "paladin shield rim",
+      { diameter: 0.34, thickness: 0.035, tessellation: 24 },
+      scene,
+    );
+    attach(rim, 0.31, 0.56, -0.19, gold, upper);
+    rim.rotation.x = Math.PI / 2;
+    box("paladin shield cross", 0.31, 0.55, -0.2, 0.04, 0.2, 0.03, gold, upper);
+  }
   root.rotation.y = side === 1 ? Math.PI : 0;
   return root;
 }
+
