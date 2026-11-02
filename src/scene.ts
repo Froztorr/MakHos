@@ -45,9 +45,8 @@ export class BoardScene {
     });
     const dpr = window.devicePixelRatio || 1;
     const mobile = matchMedia("(pointer: coarse)").matches;
-    this.engine.setHardwareScalingLevel(
-      mobile ? Math.max(1, dpr / 2) : Math.max(1, dpr / 1.5),
-    );
+    const renderPixelRatio = Math.min(dpr, mobile ? 2 : 1.5);
+    this.engine.setHardwareScalingLevel(1 / renderPixelRatio);
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0, 0, 0, 0);
     this.camera = new ArcRotateCamera(
@@ -342,4 +341,5 @@ export class BoardScene {
     }
   }
 }
+
 
