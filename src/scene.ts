@@ -43,8 +43,10 @@ export class BoardScene {
       preserveDrawingBuffer: true,
       stencil: true,
     });
+    const dpr = window.devicePixelRatio || 1;
+    const mobile = matchMedia("(pointer: coarse)").matches;
     this.engine.setHardwareScalingLevel(
-      Math.max(1, window.devicePixelRatio / 1.5),
+      mobile ? Math.max(1, dpr / 2) : Math.max(1, dpr / 1.5),
     );
     this.scene = new Scene(this.engine);
     this.scene.clearColor = new Color4(0, 0, 0, 0);
@@ -128,8 +130,9 @@ export class BoardScene {
     this.engine.runRenderLoop(() => {
       const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.05);
       this.elapsed += dt;
-      if (this.reduced) this.combat?.finish();
-      this.combat?.advance(dt);
+      // Keep essential moves and captures visible for users whose device
+      // requests reduced motion; only ambient idle movement is suppressed.
+      this.combat?.advance(dt * (this.reduced ? 2 : 1));
       for (const [id, root] of this.roots) {
         if (this.busy && this.combat?.actor === root) continue;
         const p = this.game?.pieces.find((p) => p.id === id);
@@ -139,7 +142,7 @@ export class BoardScene {
         root.position = Vector3.Lerp(
           root.position,
           target,
-          this.reduced ? 1 : Math.min(1, dt * 10),
+          this.reduced ? Math.min(1, dt * 22) : Math.min(1, dt * 10),
         );
         const body = root
           .getChildTransformNodes(true)
@@ -147,16 +150,22 @@ export class BoardScene {
         if (body) {
           const attacking =
             this.game?.last?.id === id && this.game.last.capture !== undefined;
+          const walking = remaining > 0.06;
           body.position.y = this.reduced
             ? 0
-            : remaining > 0.06
-              ? Math.sin((Math.min(1, remaining) * Math.PI) / 2) *
-                (attacking ? 0.45 : 0.15)
-              : Math.sin(this.elapsed * 2 + id) * 0.025;
+            : walking
+              ? Math.abs(Math.sin(this.elapsed * 17 + id)) *
+                (attacking ? 0.38 : 0.2) * Math.min(1, remaining * 2)
+              : Math.sin(this.elapsed * 2 + id) * 0.045;
           body.rotation.z =
-            this.reduced || !attacking
+            this.reduced
               ? 0
-              : Math.min(remaining, 0.25) * (this.effect === "bloom" ? -1 : 1);
+              : attacking && walking
+                ? Math.min(remaining, 0.25) *
+                  (this.effect === "bloom" ? -1 : 1)
+                : walking
+                  ? Math.sin(this.elapsed * 17 + id) * 0.12
+                  : Math.sin(this.elapsed * 1.5 + id) * 0.025;
         }
       }
       this.scene.render();
@@ -223,14 +232,13 @@ export class BoardScene {
         root && root.metadata?.skin !== (p.side === ownSide ? skin : other.skin)
       );
     });
-    if (changed || this.reduced || outfitChanged) {
+    if (changed || outfitChanged) {
       this.combat?.finish();
       this.combat = null;
     }
     const captured = game.last?.capture;
     const victim =
       changed &&
-      !this.reduced &&
       captured !== undefined &&
       !game.pieces.some((p) => p.id === captured)
         ? this.roots.get(captured)
@@ -335,3 +343,4 @@ export class BoardScene {
     }
   }
 }
+

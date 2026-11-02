@@ -561,7 +561,7 @@ dialog p {
   .fx-slash,
   .fx-victim,
   .fx-victim::after {
-    animation-duration: 1ms !important;
+    animation-duration: 280ms !important;
   }
 }
 @media (max-width: 1000px) {
@@ -667,4 +667,5 @@ dialog p {
   .event { margin-top: 10px; padding-top: 8px; }
   .event p { margin: 3px 0; padding: 3px 0; }
 }
+
 
