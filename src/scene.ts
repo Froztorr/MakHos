@@ -255,6 +255,29 @@ export class BoardScene {
       y: this.canvas.offsetTop + (point.y * this.canvas.clientHeight) / height,
     };
   }
+  setNeoEffects(units: { id: number; buffHits: number; guard: boolean }[]) {
+    for (const unit of units) {
+      const root = this.roots.get(unit.id);
+      if (!root) continue;
+      for (const mesh of root.getChildMeshes()) {
+        const weapon = /sword|blade|dagger|mage staff|mage orb/i.test(mesh.name);
+        const shield = /shield/i.test(mesh.name);
+        const active = (weapon && unit.buffHits > 0) || (shield && unit.guard);
+        const metadata = mesh.metadata ?? (mesh.metadata = {});
+        if (active && !metadata.neoGlow && mesh.material instanceof StandardMaterial) {
+          const original = mesh.material;
+          const glow = original.clone(`${mesh.name}-neo-glow`);
+          glow.emissiveColor = Color3.FromHexString(shield && unit.guard ? "#368ee8" : "#edaa36");
+          metadata.neoGlow = { original, glow };
+          mesh.material = glow;
+        } else if (!active && metadata.neoGlow) {
+          mesh.material = metadata.neoGlow.original;
+          metadata.neoGlow.glow.dispose();
+          delete metadata.neoGlow;
+        }
+      }
+    }
+  }
   update(
     game: Game,
     selected: number | null,
@@ -319,7 +342,7 @@ export class BoardScene {
         this.roots.set(p.id, root);
       }
       for (const child of root.getChildMeshes())
-        child.metadata = { r: p.r, c: p.c };
+        child.metadata = { ...child.metadata, r: p.r, c: p.c };
     }
     if (victim && game.last) {
       const actor = this.roots.get(game.last.id),

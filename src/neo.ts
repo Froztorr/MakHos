@@ -36,7 +36,7 @@ let game: Neo = createNeo(
   resultPending = false,
   revision = 0;
 $("#neo").innerHTML =
-  `<header><a href="./" class="back">← เกมหลัก</a><div class="logo">หมากฮอส <b>NEO</b></div><button id="help">วิธีเล่น ?</button></header><main><section class="intro"><div class="eyebrow">TACTICS · CLASSES · ADVENTURE</div><h1>ศึกหมากฮอส <em>เหนือกติกา</em></h1><p>วางแผนให้เหนือกว่า ใช้สกิลให้ถูกจังหวะ</p><div class="pill">✦ ต้นแบบ · สู้กับบอต</div></section><div class="layout"><aside class="panel army"><div class="eyebrow">YOUR SQUAD</div><h2>กองทัพของคุณ</h2><p>แตะตัวหมากเพื่อดูพลังและสกิล</p><div id="roster"></div></aside><section class="arena"><div class="opponent"><span class="avatar gold">♜</span><div><b>แม่ทัพทอง</b><small>คู่ฝึก NEO · บอต</small></div><span id="enemy-count"></span></div><div class="board-frame"><canvas id="board" aria-label="กระดาน Neo สามมิติ"></canvas><div id="flat-board" role="group" aria-label="กระดาน Neo แบบสำรอง" hidden></div><div id="hp-overlays" role="group" aria-label="หลอดพลังชีวิต"></div><div id="skill-float" hidden><button id="skill-top" aria-label="ใช้สกิล">✦ ใช้สกิล</button></div></div><div class="opponent own"><span class="avatar">♟</span><div><b>กองทัพหยก</b><small>ตาของคุณ · คิดให้สนุก</small></div><span id="own-count"></span></div><div id="message" role="status" aria-live="polite"></div><div class="actions"><button id="restart">↻ เริ่มเกมใหม่</button><button id="tutorial">✦ ดูกติกา</button></div></section><aside class="panel detail"><div class="eyebrow">YOUR NEXT MOVE</div><div id="details"></div><div class="event"><div class="eyebrow">BATTLE LOG</div><div id="log"></div></div></aside></div></main><dialog id="dialog"><button id="close" aria-label="ปิด">×</button><div id="dialog-content"></div></dialog>`;
+  `<header><a href="./" class="back">← เกมหลัก</a><div class="logo">หมากฮอส <b>NEO</b></div><button id="help">วิธีเล่น ?</button></header><main><section class="intro"><div class="eyebrow">TACTICS · CLASSES · ADVENTURE</div><h1>ศึกหมากฮอส <em>เหนือกติกา</em></h1><p>วางแผนให้เหนือกว่า ใช้สกิลให้ถูกจังหวะ</p><div class="pill">✦ ต้นแบบ · สู้กับบอต</div></section><div class="layout"><aside class="panel army"><div class="eyebrow">YOUR SQUAD</div><h2>กองทัพของคุณ</h2><p>แตะตัวหมากเพื่อดูพลังและสกิล</p><div id="roster"></div></aside><section class="arena"><div class="opponent"><span class="avatar gold">♜</span><div><b>แม่ทัพทอง</b><small>คู่ฝึก NEO · บอต</small></div><span id="enemy-count"></span></div><div class="turn-counter" id="turn-counter"></div><div class="board-frame"><div id="action-effects" aria-live="polite"></div><canvas id="board" aria-label="กระดาน Neo สามมิติ"></canvas><div id="flat-board" role="group" aria-label="กระดาน Neo แบบสำรอง" hidden></div><div id="hp-overlays" role="group" aria-label="หลอดพลังชีวิต"></div><div id="skill-float" hidden><button id="skill-top" aria-label="ใช้สกิล">✦ ใช้สกิล</button></div></div><div class="opponent own"><span class="avatar">♟</span><div><b>กองทัพหยก</b><small>ตาของคุณ · คิดให้สนุก</small></div><span id="own-count"></span></div><div id="message" role="status" aria-live="polite"></div><div class="actions"><button id="restart">↻ เริ่มเกมใหม่</button><button id="tutorial">✦ ดูกติกา</button></div></section><aside class="panel detail"><div class="eyebrow">YOUR NEXT MOVE</div><div id="details"></div><div class="event"><div class="eyebrow">BATTLE LOG</div><div id="log"></div></div></aside></div></main><dialog id="dialog"><button id="close" aria-label="ปิด">×</button><div id="dialog-content"></div></dialog>`;
 let boardScene: BoardScene | null = null;
 try {
   boardScene = new BoardScene(
@@ -128,6 +128,7 @@ document.addEventListener("click", (e) => {
   }
 });
 function render() {
+  $("#turn-counter").textContent = `ตาที่ ${game.ply + 1} · ${game.turn === 1 ? "ฝ่ายคุณ" : "ฝ่ายแม่ทัพทอง"}`;
   const unit = game.units.find((p) => p.id === selected);
   const options = unit ? actions(game, unit.id) : [];
   const allowed = options.filter((a) =>
@@ -164,6 +165,7 @@ function render() {
       undefined,
       (piece) => game.units.find((u) => u.id === piece.id)?.role,
     );
+    boardScene.setNeoEffects(game.units);
   } else {
     const fallback = $("#flat-board");
     fallback.innerHTML = Array.from({ length: 64 }, (_, i) => {
@@ -174,7 +176,7 @@ function render() {
       const target = p ? allowed.find((a) => a.target === p.id) : undefined;
       const highlight = !!move || !!target;
       const skillChoice = skill && highlight;
-      return `<button class="tile ${(r + c) % 2 ? "dark" : ""} ${highlight ? "possible" : ""} ${skillChoice ? "skill-choice" : ""} ${p?.id === selected ? "chosen" : ""}" data-r="${r}" data-c="${c}" aria-label="${String.fromCharCode(65 + c)}${8 - r} ${p ? `${p.side === 1 ? "หยก" : "ทอง"} ${labels[p.role]} เลเวล ${p.level} เลือด ${p.hp} จาก ${stats(p).maxHp}` : "ช่องว่าง"}">${p ? `<span class="unit ${p.side === 1 ? "jade" : "gold"}"><span class="symbol">${symbols[p.role]}</span>${p.king ? "<i>♛</i>" : ""}</span>${p.hp < stats(p).maxHp ? `<span class="hp"><i style="width:${(100 * p.hp) / stats(p).maxHp}%"></i></span><span class="hptext">${p.hp}</span>` : ""}${target ? '<span class="target">⚔</span>' : ""}` : highlight ? '<span class="dot"></span>' : ""}</button>`;
+      return `<button class="tile ${(r + c) % 2 ? "dark" : ""} ${highlight ? "possible" : ""} ${skillChoice ? "skill-choice" : ""} ${p?.id === selected ? "chosen" : ""}" data-r="${r}" data-c="${c}" aria-label="${String.fromCharCode(65 + c)}${8 - r} ${p ? `${p.side === 1 ? "หยก" : "ทอง"} ${labels[p.role]} เลเวล ${p.level} เลือด ${p.hp} จาก ${stats(p).maxHp}` : "ช่องว่าง"}">${p ? `<span class="unit ${p.side === 1 ? "jade" : "gold"} ${p.buffHits > 0 ? "buff-atk" : ""} ${p.guard ? "buff-guard" : ""}"><span class="symbol">${symbols[p.role]}</span>${p.king ? "<i>♛</i>" : ""}</span>${p.hp < stats(p).maxHp ? `<span class="hp"><i style="width:${(100 * p.hp) / stats(p).maxHp}%"></i></span><span class="hptext">${p.hp}</span>` : ""}${target ? '<span class="target">⚔</span>' : ""}` : highlight ? '<span class="dot"></span>' : ""}</button>`;
     }).join("");
     if (combatFx) {
       const rect = fallback.getBoundingClientRect();
@@ -316,7 +318,9 @@ async function perform(action: Action) {
   if (busy || boardScene?.busy) return;
   const attackerBefore = game.units.find((x) => x.id === action.id)!;
   const targetBefore = action.target === undefined ? undefined : game.units.find((x) => x.id === action.target);
+  const before = game;
   game = applyNeo(game, action);
+  showActionEffect(before, game, action);
   log.push(game.log);
   selected = null;
   skill = false;
@@ -359,7 +363,9 @@ async function perform(action: Action) {
     }
     const attacker = game.units.find((x) => x.id === a.id)!;
     const target = a.target === undefined ? undefined : game.units.find((x) => x.id === a.target);
+    const before = game;
     game = applyNeo(game, a);
+    showActionEffect(before, game, a);
     log.push(game.log);
     if (target && target.side !== attacker.side) {
       combatFx = {
@@ -389,6 +395,41 @@ async function perform(action: Action) {
   busy = false;
   turnPhase = "idle";
   render();
+}
+function showActionEffect(before: Neo, after: Neo, action: Action) {
+  const actor = before.units.find((u) => u.id === action.id);
+  const target = before.units.find((u) => u.id === action.target);
+  if (!actor) return;
+  const subject = target ?? actor;
+  let label = "", kind = "";
+  if (action.kind === "skill" && actor.role === "mage") {
+    label = `ATK +${after.units.find((u) => u.id === subject.id)?.buff ?? 0}`;
+    kind = "buff";
+  } else if (action.kind === "skill" && actor.role === "paladin") {
+    label = "โล่สะท้อน"; kind = "guard";
+  } else if (target && target.side !== actor.side) {
+    label = after.lastDamage > 0 ? `−${after.lastDamage} HP` : "MISS";
+    kind = after.lastDamage > 0 ? "damage" : "miss";
+  }
+  if (!label) return;
+  const frame = $(".board-frame").getBoundingClientRect();
+  const board = $(boardScene ? "#board" : "#flat-board").getBoundingClientRect();
+  const point = boardScene?.projectPiece(subject.id, 1.45) ?? {
+    x: board.left - frame.left + ((subject.c + 0.5) * board.width) / 8,
+    y: board.top - frame.top + ((subject.r + 0.3) * board.height) / 8,
+  };
+  const mark = revision;
+  const show = () => {
+    if (mark !== revision) return;
+    const element = document.createElement("span");
+    element.className = `action-pop ${kind}`;
+    element.style.left = `${point.x}px`; element.style.top = `${point.y}px`;
+    element.textContent = label;
+    $("#action-effects").append(element);
+    element.addEventListener("animationend", () => element.remove(), { once: true });
+  };
+  if (target && target.side !== actor.side && boardScene) setTimeout(show, 400);
+  else show();
 }
 function waitForTurnAnimation() {
   if (boardScene) return boardScene.waitForIdle();

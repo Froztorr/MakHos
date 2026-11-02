@@ -737,4 +737,10 @@ dialog p {
 
 
 
+.turn-counter { text-align:center; color:#f2d596; font-weight:700; padding:8px; }
+#action-effects { position:absolute; inset:0; z-index:9; pointer-events:none; overflow:hidden; }
+.action-pop { position:absolute; transform:translate(-50%,-50%); white-space:nowrap; font-weight:800; font-size:clamp(16px,3vw,25px); color:#fff; text-shadow:0 2px 4px #000, 0 0 8px #000; animation:action-rise 1.3s ease-out forwards; }
+.action-pop.damage { color:#ff7772; } .action-pop.miss { color:#e8f8ff; } .action-pop.buff { color:#ffdf75; } .action-pop.guard { color:#91ccff; }
+@keyframes action-rise { 0% { opacity:0; transform:translate(-50%,-30%) scale(.8); } 15% { opacity:1; transform:translate(-50%,-50%) scale(1.1); } 75% { opacity:1; } 100% { opacity:0; transform:translate(-50%,-140%) scale(1); } }
+.unit.buff-atk { filter:drop-shadow(0 0 7px #ffca4b); } .unit.buff-guard { outline:3px solid #68c6ff; }
 
