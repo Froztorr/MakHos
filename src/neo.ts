@@ -364,7 +364,6 @@ function queueBot() {
     } catch (error) {
       console.error("Neo bot turn failed", error);
       game.log = "แม่ทัพทองขัดข้อง · แตะเริ่มเกมใหม่เพื่อลองอีกครั้ง";
-      game.winner = 1;
     }
     busy = false;
     render();
@@ -374,5 +373,6 @@ window.addEventListener("resize", () => {
   if (selected !== null) render();
 });
 render();
+
 
 
