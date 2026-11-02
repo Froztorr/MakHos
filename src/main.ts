@@ -761,9 +761,7 @@ $("#chat-input").addEventListener("focus", () => {
 $("#chat-input").addEventListener("blur", viewport);
 try {
   scene = new BoardScene($("#board"), pick);
-  scene.reduced =
-    stored("makhos-reduced") === "true" ||
-    matchMedia("(prefers-reduced-motion: reduce)").matches;
+  scene.reduced = stored("makhos-reduced") === "true";
 } catch {
   flat = true;
   $("#board").hidden = true;
@@ -776,3 +774,4 @@ if (token)
   api("/state")
     .then(acceptOnline)
     .catch(() => {});
+

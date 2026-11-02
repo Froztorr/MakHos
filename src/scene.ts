@@ -130,8 +130,7 @@ export class BoardScene {
     this.engine.runRenderLoop(() => {
       const dt = Math.min(this.engine.getDeltaTime() / 1000, 0.05);
       this.elapsed += dt;
-      // Keep essential moves and captures visible for users whose device
-      // requests reduced motion; only ambient idle movement is suppressed.
+      // A faster capture is used only when the player enables reduced motion.
       this.combat?.advance(dt * (this.reduced ? 2 : 1));
       for (const [id, root] of this.roots) {
         if (this.busy && this.combat?.actor === root) continue;
