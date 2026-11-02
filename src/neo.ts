@@ -1,4 +1,6 @@
 import "./neo.css";
+import { BoardScene } from "./scene.ts";
+import type { Move } from "./rules.ts";
 import {
   actions,
   applyNeo,
@@ -7,6 +9,7 @@ import {
   description,
   labels,
   stats,
+  viewGame,
   type Action,
   type Neo,
   type Unit,
@@ -29,9 +32,20 @@ let game: Neo = createNeo(
   busy = false,
   combatFx: { fromR: number; fromC: number; toR: number; toC: number; victim: string; attackerSide: 1 | -1; victimSide: 1 | -1; killed: boolean } | null = null,
   awarded = false,
+  resultPending = false,
   revision = 0;
 $("#neo").innerHTML =
-  `<header><a href="./" class="back">← เกมหลัก</a><div class="logo">หมากฮอส <b>NEO</b></div><button id="help">วิธีเล่น ?</button></header><main><section class="intro"><div class="eyebrow">TACTICS · CLASSES · ADVENTURE</div><h1>ศึกหมากฮอส <em>เหนือกติกา</em></h1><p>วางแผนให้เหนือกว่า ใช้สกิลให้ถูกจังหวะ</p><div class="pill">✦ ต้นแบบ · สู้กับบอต</div></section><div class="layout"><aside class="panel army"><div class="eyebrow">YOUR SQUAD</div><h2>กองทัพของคุณ</h2><p>แตะตัวหมากเพื่อดูพลังและสกิล</p><div id="roster"></div></aside><section class="arena"><div class="opponent"><span class="avatar gold">♜</span><div><b>แม่ทัพทอง</b><small>คู่ฝึก NEO · บอต</small></div><span id="enemy-count"></span></div><div class="board-frame"><div id="board" role="group" aria-label="กระดาน Neo"></div></div><div class="opponent own"><span class="avatar">♟</span><div><b>กองทัพหยก</b><small>ตาของคุณ · คิดให้สนุก</small></div><span id="own-count"></span></div><div id="message" role="status" aria-live="polite"></div><div class="actions"><button id="restart">↻ เริ่มเกมใหม่</button><button id="tutorial">✦ ดูกติกา</button></div></section><aside class="panel detail"><div class="eyebrow">YOUR NEXT MOVE</div><div id="details"></div><div class="event"><div class="eyebrow">BATTLE LOG</div><div id="log"></div></div></aside></div></main><dialog id="dialog"><button id="close" aria-label="ปิด">×</button><div id="dialog-content"></div></dialog>`;
+  `<header><a href="./" class="back">← เกมหลัก</a><div class="logo">หมากฮอส <b>NEO</b></div><button id="help">วิธีเล่น ?</button></header><main><section class="intro"><div class="eyebrow">TACTICS · CLASSES · ADVENTURE</div><h1>ศึกหมากฮอส <em>เหนือกติกา</em></h1><p>วางแผนให้เหนือกว่า ใช้สกิลให้ถูกจังหวะ</p><div class="pill">✦ ต้นแบบ · สู้กับบอต</div></section><div class="layout"><aside class="panel army"><div class="eyebrow">YOUR SQUAD</div><h2>กองทัพของคุณ</h2><p>แตะตัวหมากเพื่อดูพลังและสกิล</p><div id="roster"></div></aside><section class="arena"><div class="opponent"><span class="avatar gold">♜</span><div><b>แม่ทัพทอง</b><small>คู่ฝึก NEO · บอต</small></div><span id="enemy-count"></span></div><div class="board-frame"><canvas id="board" aria-label="กระดาน Neo สามมิติ"></canvas><div id="flat-board" role="group" aria-label="กระดาน Neo แบบสำรอง" hidden></div></div><div class="opponent own"><span class="avatar">♟</span><div><b>กองทัพหยก</b><small>ตาของคุณ · คิดให้สนุก</small></div><span id="own-count"></span></div><div id="message" role="status" aria-live="polite"></div><div class="actions"><button id="restart">↻ เริ่มเกมใหม่</button><button id="tutorial">✦ ดูกติกา</button></div></section><aside class="panel detail"><div class="eyebrow">YOUR NEXT MOVE</div><div id="details"></div><div class="event"><div class="eyebrow">BATTLE LOG</div><div id="log"></div></div></aside></div></main><dialog id="dialog"><button id="close" aria-label="ปิด">×</button><div id="dialog-content"></div></dialog>`;
+let boardScene: BoardScene | null = null;
+try {
+  boardScene = new BoardScene(
+    $("#board") as HTMLCanvasElement,
+    (r, c) => pick(r, c),
+  );
+} catch {
+  $("#board").setAttribute("hidden", "");
+  $("#flat-board").removeAttribute("hidden");
+}
 let log: string[] = [];
 const diag = $<HTMLDialogElement>("#dialog");
 const show = (html: string) => {
@@ -102,29 +116,45 @@ function render() {
   const allowed = options.filter((a) =>
     skill ? a.kind === "skill" : a.kind !== "skill",
   );
-  $("#board").innerHTML = Array.from({ length: 64 }, (_, i) => {
-    const r = Math.floor(i / 8),
-      c = i % 8,
-      p = game.units.find((x) => x.r === r && x.c === c);
-    const move = allowed.find((a) => a.r === r && a.c === c);
-    const target = p ? allowed.find((a) => a.target === p.id) : undefined;
-    const highlight = !!move || !!target;
-    return `<button class="tile ${(r + c) % 2 ? "dark" : ""} ${highlight ? "possible" : ""} ${p?.id === selected ? "chosen" : ""}" data-r="${r}" data-c="${c}" aria-label="${String.fromCharCode(65 + c)}${8 - r} ${p ? `${p.side === 1 ? "หยก" : "ทอง"} ${labels[p.role]} เลเวล ${p.level} เลือด ${p.hp} จาก ${stats(p).maxHp}` : "ช่องว่าง"}">${p ? `<span class="unit ${p.side === 1 ? "jade" : "gold"}"><span class="symbol">${symbols[p.role]}</span>${p.king ? "<i>♛</i>" : ""}</span><span class="hp"><i style="width:${(100 * p.hp) / stats(p).maxHp}%"></i></span><span class="hptext">${p.hp}</span>${target ? '<span class="target">⚔</span>' : ""}` : highlight ? '<span class="dot"></span>' : ""}</button>`;
-  }).join("");
-  if (combatFx) {
-    const rect = $("#board").getBoundingClientRect();
-    const cell = 100 / 8;
-    const sideClass = combatFx.victimSide === 1 ? "jade" : "gold";
-    const victimPos = `left:${combatFx.toC * cell}%;top:${combatFx.toR * cell}%;`;
-    const attackerPos = `left:${combatFx.fromC * cell}%;top:${combatFx.fromR * cell}%;--dx:${(combatFx.toC - combatFx.fromC) * rect.width / 8}px;--dy:${(combatFx.toR - combatFx.fromR) * rect.height / 8}px;`;
-    const attackerClass = combatFx.attackerSide === 1 ? "jade" : "gold";
-    $("#board").insertAdjacentHTML("beforeend", `<div class="combat-fx" aria-hidden="true"><span class="fx-unit fx-attacker ${attackerClass}" style="${attackerPos}">⚔</span><span class="fx-unit fx-victim ${sideClass} ${combatFx.killed ? "split" : "hit"}" style="${victimPos}">${combatFx.victim}</span><span class="fx-slash" style="${victimPos}">✦</span></div>`);
-  }
-  document
-    .querySelectorAll<HTMLButtonElement>(".tile")
-    .forEach(
+  if (boardScene) {
+    const boardMoves: Move[] = allowed.flatMap((a) => {
+      if (a.r !== undefined && a.c !== undefined)
+        return [
+          {
+            id: a.id,
+            r: a.r,
+            c: a.c,
+            ...(a.target === undefined ? {} : { capture: a.target }),
+          },
+        ];
+      const target = game.units.find((p) => p.id === a.target);
+      return target ? [{ id: a.id, r: target.r, c: target.c }] : [];
+    });
+    boardScene.update(viewGame(game), selected, boardMoves);
+  } else {
+    const fallback = $("#flat-board");
+    fallback.innerHTML = Array.from({ length: 64 }, (_, i) => {
+      const r = Math.floor(i / 8),
+        c = i % 8,
+        p = game.units.find((x) => x.r === r && x.c === c);
+      const move = allowed.find((a) => a.r === r && a.c === c);
+      const target = p ? allowed.find((a) => a.target === p.id) : undefined;
+      const highlight = !!move || !!target;
+      return `<button class="tile ${(r + c) % 2 ? "dark" : ""} ${highlight ? "possible" : ""} ${p?.id === selected ? "chosen" : ""}" data-r="${r}" data-c="${c}" aria-label="${String.fromCharCode(65 + c)}${8 - r} ${p ? `${p.side === 1 ? "หยก" : "ทอง"} ${labels[p.role]} เลเวล ${p.level} เลือด ${p.hp} จาก ${stats(p).maxHp}` : "ช่องว่าง"}">${p ? `<span class="unit ${p.side === 1 ? "jade" : "gold"}"><span class="symbol">${symbols[p.role]}</span>${p.king ? "<i>♛</i>" : ""}</span><span class="hp"><i style="width:${(100 * p.hp) / stats(p).maxHp}%"></i></span><span class="hptext">${p.hp}</span>${target ? '<span class="target">⚔</span>' : ""}` : highlight ? '<span class="dot"></span>' : ""}</button>`;
+    }).join("");
+    if (combatFx) {
+      const rect = fallback.getBoundingClientRect();
+      const cell = 100 / 8;
+      const sideClass = combatFx.victimSide === 1 ? "jade" : "gold";
+      const victimPos = `left:${combatFx.toC * cell}%;top:${combatFx.toR * cell}%;`;
+      const attackerPos = `left:${combatFx.fromC * cell}%;top:${combatFx.fromR * cell}%;--dx:${(combatFx.toC - combatFx.fromC) * rect.width / 8}px;--dy:${(combatFx.toR - combatFx.fromR) * rect.height / 8}px;`;
+      const attackerClass = combatFx.attackerSide === 1 ? "jade" : "gold";
+      fallback.insertAdjacentHTML("beforeend", `<div class="combat-fx" aria-hidden="true"><span class="fx-unit fx-attacker ${attackerClass}" style="${attackerPos}">⚔</span><span class="fx-unit fx-victim ${sideClass} ${combatFx.killed ? "split" : "hit"}" style="${victimPos}">${combatFx.victim}</span><span class="fx-slash" style="${victimPos}">✦</span></div>`);
+    }
+    fallback.querySelectorAll<HTMLButtonElement>(".tile").forEach(
       (b) => (b.onclick = () => pick(Number(b.dataset.r), Number(b.dataset.c))),
     );
+  }
   $("#enemy-count").textContent =
     `${game.units.filter((x) => x.side === -1).length} ตัว`;
   $("#own-count").textContent =
@@ -183,10 +213,17 @@ function render() {
         .map((x) => `<p>${x}</p>`)
         .join("")
     : "<p>การต่อสู้จะปรากฏที่นี่</p>";
-  if (game.winner !== null) persistResult();
+  if (game.winner !== null && !resultPending && !awarded) {
+    resultPending = true;
+    (boardScene?.waitForIdle() ?? Promise.resolve()).then(() => {
+      resultPending = false;
+      persistResult();
+    });
+  }
 }
 function pick(r: number, c: number) {
-  if (busy || game.turn !== 1 || game.winner !== null) return;
+  if (busy || boardScene?.busy || game.turn !== 1 || game.winner !== null)
+    return;
   const p = game.units.find((x) => x.r === r && x.c === c),
     opts =
       selected === null
@@ -280,3 +317,4 @@ function queueBot() {
   }, 500);
 }
 render();
+

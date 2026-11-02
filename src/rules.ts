@@ -6,7 +6,13 @@ export type Piece = {
   r: number;
   c: number;
 };
-export type Move = { id: number; r: number; c: number; capture?: number };
+export type Move = {
+  id: number;
+  r: number;
+  c: number;
+  capture?: number;
+  hit?: number;
+};
 export type Game = {
   pieces: Piece[];
   holes: number[];
@@ -238,3 +244,4 @@ export function bestMove(g: Game, depth = 3): Move | undefined {
   }
   return best;
 }
+

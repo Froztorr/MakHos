@@ -19,12 +19,15 @@ export class CaptureAnimation {
   private arm: TransformNode;
   private upper: TransformNode;
   private lower: TransformNode;
+  private victimBody: TransformNode;
+  private lethal: boolean;
+  private moveOnHit: boolean;
   private approach: Vector3;
   private direction: Vector3;
   private homeRotation: number;
   private flash: ReturnType<typeof MeshBuilder.CreateTorus>;
   actor: TransformNode;
-  private victim: TransformNode;
+  victim: TransformNode;
   private from: Vector3;
   private to: Vector3;
   constructor(
@@ -34,9 +37,13 @@ export class CaptureAnimation {
     to: Vector3,
     scene: Scene,
     material: StandardMaterial,
+    lethal = true,
+    moveOnHit = true,
   ) {
     this.actor = actor;
     this.victim = victim;
+    this.lethal = lethal;
+    this.moveOnHit = moveOnHit;
     this.from = from;
     this.to = to;
     this.done = new Promise((resolve) => (this.resolve = resolve));
@@ -49,6 +56,9 @@ export class CaptureAnimation {
     this.lower = victim
       .getChildTransformNodes()
       .find((n) => n.name === "lower-half")!;
+    this.victimBody = victim
+      .getChildTransformNodes()
+      .find((n) => n.name === "body")!;
     this.homeRotation = actor.rotation.y;
     this.direction = victim.position.subtract(from).normalize();
     this.direction.y = 0;
@@ -86,21 +96,32 @@ export class CaptureAnimation {
     if (t >= 0.43) {
       this.impacted = true;
       const split = clamp((t - 0.43) / 0.28);
-      this.upper.position.x = split * 0.65;
-      this.upper.position.y =
-        0.49 + Math.sin(split * Math.PI) * 0.28 - split * 0.18;
-      this.upper.rotation.z = -split * 1.5;
-      this.upper.rotation.x = split * 0.35;
-      this.lower.position.x = -split * 0.22;
-      this.lower.rotation.z = split * 0.45;
+      if (this.lethal) {
+        this.upper.position.x = split * 0.65;
+        this.upper.position.y =
+          0.49 + Math.sin(split * Math.PI) * 0.28 - split * 0.18;
+        this.upper.rotation.z = -split * 1.5;
+        this.upper.rotation.x = split * 0.35;
+        this.lower.position.x = -split * 0.22;
+        this.lower.rotation.z = split * 0.45;
+      } else {
+        const recoil = Math.sin(split * Math.PI);
+        this.victimBody.position.x = recoil * 0.1;
+        this.victimBody.rotation.z = recoil * 0.3;
+      }
       this.flash.visibility = Math.max(0, 1 - (t - 0.43) / 0.18);
       this.flash.scaling.setAll(1 + split * 0.6);
-      for (const m of this.victim.getChildMeshes())
-        m.visibility = 1 - clamp((t - 0.6) / 0.22);
+      if (this.lethal)
+        for (const m of this.victim.getChildMeshes())
+          m.visibility = 1 - clamp((t - 0.6) / 0.22);
       if (t >= 0.5) this.arm.rotation.x = 1.2 * (1 - ease((t - 0.5) / 0.28));
       const travel = ease((t - 0.48) / 0.4);
       this.actor.position.copyFrom(
-        Vector3.Lerp(this.approach, this.to, travel),
+        Vector3.Lerp(
+          this.approach,
+          this.lethal || this.moveOnHit ? this.to : this.from,
+          travel,
+        ),
       );
       this.actor.position.y = 0.13 + Math.sin(travel * Math.PI) * 0.16;
     }
@@ -109,11 +130,19 @@ export class CaptureAnimation {
   finish() {
     if (this.finished) return;
     this.finished = true;
-    this.actor.position.copyFrom(this.to);
+    this.actor.position.copyFrom(
+      this.lethal || this.moveOnHit ? this.to : this.from,
+    );
     this.actor.rotation.y = this.homeRotation;
     this.arm.rotation.x = 0;
-    this.victim.dispose();
+    if (this.lethal) this.victim.dispose();
+    else {
+      this.victimBody.position.set(0, 0, 0);
+      this.victimBody.rotation.set(0, 0, 0);
+      for (const m of this.victim.getChildMeshes()) m.isPickable = true;
+    }
     this.flash.dispose();
     this.resolve();
   }
 }
+

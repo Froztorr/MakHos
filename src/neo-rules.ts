@@ -31,6 +31,7 @@ export type Neo = {
   quiet: number;
   log: string;
   lastDamage: number;
+  last: { id: number; r: number; c: number; capture?: number; hit?: number } | null;
 };
 export const labels: Record<Role, string> = {
   warrior: "นักรบ",
@@ -116,6 +117,7 @@ export function createNeo(levels: Record<string, number> = {}): Neo {
     quiet: 0,
     log: "เลือกตัวหมากเพื่อดูช่องเดินและสกิล",
     lastDamage: 0,
+    last: null,
   };
 }
 const inside = (r: number, c: number) => r >= 0 && r < 8 && c >= 0 && c < 8;
@@ -258,6 +260,19 @@ export function applyNeo(g: Neo, a: Action, random = Math.random): Neo {
     p.king = true;
     n.log += " · เลื่อนเป็นฮอส!";
   }
+  n.last =
+    combat && a.target !== undefined
+      ? {
+          id: p.id,
+          r: p.r,
+          c: p.c,
+          ...(n.units.some((x) => x.id === a.target)
+            ? { hit: a.target }
+            : { capture: a.target }),
+        }
+      : a.kind === "move"
+        ? { id: p.id, r: p.r, c: p.c }
+        : null;
   n.ply++;
   n.quiet = combat ? 0 : n.quiet + 1;
   n.turn = g.turn === 1 ? -1 : 1;
@@ -279,7 +294,7 @@ export function viewGame(g: Neo): Game {
     winner: g.winner,
     quiet: 0,
     history: [],
-    last: null,
+    last: g.last,
   };
 }
 export function botAction(g: Neo): Action | undefined {
@@ -314,3 +329,4 @@ export function botAction(g: Neo): Action | undefined {
   }
   return best;
 }
+

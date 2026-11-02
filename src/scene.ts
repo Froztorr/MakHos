@@ -132,7 +132,11 @@ export class BoardScene {
       // A faster capture is used only when the player enables reduced motion.
       this.combat?.advance(dt * (this.reduced ? 2 : 1));
       for (const [id, root] of this.roots) {
-        if (this.busy && this.combat?.actor === root) continue;
+        if (
+          this.busy &&
+          (this.combat?.actor === root || this.combat?.victim === root)
+        )
+          continue;
         const p = this.game?.pieces.find((p) => p.id === id);
         if (!p) continue;
         const target = new Vector3(p.c - 3.5, 0.13, 3.5 - p.r);
@@ -223,7 +227,9 @@ export class BoardScene {
   ) {
     const old = this.game;
     const changed =
-      !!old && JSON.stringify(old.pieces) !== JSON.stringify(game.pieces);
+      !!old &&
+      (JSON.stringify(old.pieces) !== JSON.stringify(game.pieces) ||
+        game.last !== old.last);
     const outfitChanged = game.pieces.some((p) => {
       const root = this.roots.get(p.id);
       return (
@@ -235,11 +241,13 @@ export class BoardScene {
       this.combat = null;
     }
     const captured = game.last?.capture;
+    const hit = game.last?.hit;
+    const victimId = captured ?? hit;
     const victim =
       changed &&
-      captured !== undefined &&
-      !game.pieces.some((p) => p.id === captured)
-        ? this.roots.get(captured)
+      victimId !== undefined &&
+      (captured !== undefined || game.pieces.some((p) => p.id === victimId))
+        ? this.roots.get(victimId)
         : undefined;
     this.game = game;
     this.selected = selected;
@@ -280,6 +288,12 @@ export class BoardScene {
           new Vector3(game.last.c - 3.5, 0.13, 3.5 - game.last.r),
           this.scene,
           this.mat(actorEffect === "bloom" ? "#f5b3c5" : "#fff0b8"),
+          captured !== undefined,
+          captured !== undefined ||
+            Vector3.Distance(
+              new Vector3(previous.c - 3.5, 0.13, 3.5 - previous.r),
+              new Vector3(game.last.c - 3.5, 0.13, 3.5 - game.last.r),
+            ) > 0.1,
         );
       } else victim.dispose();
     }
@@ -302,7 +316,8 @@ export class BoardScene {
     };
     const p = game.pieces.find((p) => p.id === selected);
     if (p) marker(p.r, p.c, "#fff0a8", true);
-    for (const m of moves) marker(m.r, m.c, "#f9e1a2");
+    for (const m of moves)
+      marker(m.r, m.c, m.capture === undefined ? "#f9e1a2" : "#e58a64");
     for (const m of this.terrain) m.dispose();
     this.terrain = [];
     for (let i = 0; i < 64; i++) {

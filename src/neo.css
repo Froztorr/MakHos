@@ -210,10 +210,23 @@ main {
     0 18px 35px #07100a90;
 }
 #board {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1.1;
+  touch-action: none;
+}
+#board[hidden] {
+  display: none;
+}
+#flat-board {
   position: relative;
   display: grid;
   grid-template-columns: repeat(8, 1fr);
   aspect-ratio: 1;
+}
+#flat-board[hidden] {
+  display: none;
 }
 .tile {
   min-width: 0;
@@ -659,5 +672,6 @@ dialog p {
   .event { margin-top: 10px; padding-top: 8px; }
   .event p { margin: 3px 0; padding: 3px 0; }
 }
+
 
 
