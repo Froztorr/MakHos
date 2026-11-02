@@ -35,6 +35,7 @@ export class BoardScene {
   private materials = new Map<string, StandardMaterial>();
   private terrain: Mesh[] = [];
   private combat: CaptureAnimation | null = null;
+  private idleWaiters: (() => void)[] = [];
   constructor(
     public canvas: HTMLCanvasElement,
     public onPick: (r: number, c: number) => void,
@@ -170,6 +171,7 @@ export class BoardScene {
                   : Math.sin(this.elapsed * 1.5 + id) * 0.025;
         }
       }
+      this.resolveIdleWaiters();
       this.scene.render();
     });
   }
@@ -211,19 +213,39 @@ export class BoardScene {
     return root;
   }
   get busy() {
-    return !!this.combat && !this.combat.finished;
+    return (!!this.combat && !this.combat.finished) || this.hasMovingPieces();
   }
-  waitForIdle() {
-    return this.combat?.done ?? Promise.resolve();
+  waitForIdle(): Promise<void> {
+    if (this.combat && !this.combat.finished)
+      return this.combat.done.then(() => this.waitForIdle());
+    if (!this.hasMovingPieces()) return Promise.resolve();
+    return new Promise<void>((resolve) => this.idleWaiters.push(resolve));
   }
-  projectPiece(id: number) {
+  private hasMovingPieces() {
+    for (const [id, root] of this.roots) {
+      const p = this.game?.pieces.find((piece) => piece.id === id);
+      if (
+        p &&
+        Vector3.Distance(root.position, new Vector3(p.c - 3.5, 0.13, 3.5 - p.r)) >
+          0.06
+      )
+        return true;
+    }
+    return false;
+  }
+  private resolveIdleWaiters() {
+    if (this.combat && !this.combat.finished) return;
+    if (this.hasMovingPieces()) return;
+    for (const resolve of this.idleWaiters.splice(0)) resolve();
+  }
+  projectPiece(id: number, elevation = 1.7) {
     const p = this.game?.pieces.find((piece) => piece.id === id);
     if (!p || !this.canvas.clientWidth || !this.engine.getRenderWidth())
       return null;
     const width = this.engine.getRenderWidth();
     const height = this.engine.getRenderHeight();
     const point = Vector3.Project(
-      new Vector3(p.c - 3.5, 1.7, 3.5 - p.r),
+      new Vector3(p.c - 3.5, elevation, 3.5 - p.r),
       Matrix.Identity(),
       this.scene.getTransformMatrix(),
       this.camera.viewport.toGlobal(width, height),
@@ -379,6 +401,7 @@ export class BoardScene {
     }
   }
 }
+
 
 
 

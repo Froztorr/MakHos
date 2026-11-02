@@ -35,7 +35,7 @@ let game: Neo = createNeo(
   resultPending = false,
   revision = 0;
 $("#neo").innerHTML =
-  `<header><a href="./" class="back">← เกมหลัก</a><div class="logo">หมากฮอส <b>NEO</b></div><button id="help">วิธีเล่น ?</button></header><main><section class="intro"><div class="eyebrow">TACTICS · CLASSES · ADVENTURE</div><h1>ศึกหมากฮอส <em>เหนือกติกา</em></h1><p>วางแผนให้เหนือกว่า ใช้สกิลให้ถูกจังหวะ</p><div class="pill">✦ ต้นแบบ · สู้กับบอต</div></section><div class="layout"><aside class="panel army"><div class="eyebrow">YOUR SQUAD</div><h2>กองทัพของคุณ</h2><p>แตะตัวหมากเพื่อดูพลังและสกิล</p><div id="roster"></div></aside><section class="arena"><div class="opponent"><span class="avatar gold">♜</span><div><b>แม่ทัพทอง</b><small>คู่ฝึก NEO · บอต</small></div><span id="enemy-count"></span></div><div class="board-frame"><canvas id="board" aria-label="กระดาน Neo สามมิติ"></canvas><div id="flat-board" role="group" aria-label="กระดาน Neo แบบสำรอง" hidden></div><div id="skill-float" hidden><button id="skill-top" aria-label="ใช้สกิล">✦ ใช้สกิล</button></div></div><div class="opponent own"><span class="avatar">♟</span><div><b>กองทัพหยก</b><small>ตาของคุณ · คิดให้สนุก</small></div><span id="own-count"></span></div><div id="message" role="status" aria-live="polite"></div><div class="actions"><button id="restart">↻ เริ่มเกมใหม่</button><button id="tutorial">✦ ดูกติกา</button></div></section><aside class="panel detail"><div class="eyebrow">YOUR NEXT MOVE</div><div id="details"></div><div class="event"><div class="eyebrow">BATTLE LOG</div><div id="log"></div></div></aside></div></main><dialog id="dialog"><button id="close" aria-label="ปิด">×</button><div id="dialog-content"></div></dialog>`;
+  `<header><a href="./" class="back">← เกมหลัก</a><div class="logo">หมากฮอส <b>NEO</b></div><button id="help">วิธีเล่น ?</button></header><main><section class="intro"><div class="eyebrow">TACTICS · CLASSES · ADVENTURE</div><h1>ศึกหมากฮอส <em>เหนือกติกา</em></h1><p>วางแผนให้เหนือกว่า ใช้สกิลให้ถูกจังหวะ</p><div class="pill">✦ ต้นแบบ · สู้กับบอต</div></section><div class="layout"><aside class="panel army"><div class="eyebrow">YOUR SQUAD</div><h2>กองทัพของคุณ</h2><p>แตะตัวหมากเพื่อดูพลังและสกิล</p><div id="roster"></div></aside><section class="arena"><div class="opponent"><span class="avatar gold">♜</span><div><b>แม่ทัพทอง</b><small>คู่ฝึก NEO · บอต</small></div><span id="enemy-count"></span></div><div class="board-frame"><canvas id="board" aria-label="กระดาน Neo สามมิติ"></canvas><div id="flat-board" role="group" aria-label="กระดาน Neo แบบสำรอง" hidden></div><div id="hp-overlays" role="group" aria-label="หลอดพลังชีวิต"></div><div id="skill-float" hidden><button id="skill-top" aria-label="ใช้สกิล">✦ ใช้สกิล</button></div></div><div class="opponent own"><span class="avatar">♟</span><div><b>กองทัพหยก</b><small>ตาของคุณ · คิดให้สนุก</small></div><span id="own-count"></span></div><div id="message" role="status" aria-live="polite"></div><div class="actions"><button id="restart">↻ เริ่มเกมใหม่</button><button id="tutorial">✦ ดูกติกา</button></div></section><aside class="panel detail"><div class="eyebrow">YOUR NEXT MOVE</div><div id="details"></div><div class="event"><div class="eyebrow">BATTLE LOG</div><div id="log"></div></div></aside></div></main><dialog id="dialog"><button id="close" aria-label="ปิด">×</button><div id="dialog-content"></div></dialog>`;
 let boardScene: BoardScene | null = null;
 try {
   boardScene = new BoardScene(
@@ -139,11 +139,17 @@ function render() {
             id: a.id,
             r: a.r,
             c: a.c,
-            ...(a.target === undefined ? {} : { capture: a.target }),
+            ...(a.target !== undefined
+              ? { capture: a.target }
+              : skill
+                ? { capture: -1 }
+                : {}),
           },
         ];
       const target = game.units.find((p) => p.id === a.target);
-      return target ? [{ id: a.id, r: target.r, c: target.c }] : [];
+      return target
+        ? [{ id: a.id, r: target.r, c: target.c, capture: a.target ?? -1 }]
+        : [];
     });
     boardScene.update(
       viewGame(game),
@@ -165,7 +171,8 @@ function render() {
       const move = allowed.find((a) => a.r === r && a.c === c);
       const target = p ? allowed.find((a) => a.target === p.id) : undefined;
       const highlight = !!move || !!target;
-      return `<button class="tile ${(r + c) % 2 ? "dark" : ""} ${highlight ? "possible" : ""} ${p?.id === selected ? "chosen" : ""}" data-r="${r}" data-c="${c}" aria-label="${String.fromCharCode(65 + c)}${8 - r} ${p ? `${p.side === 1 ? "หยก" : "ทอง"} ${labels[p.role]} เลเวล ${p.level} เลือด ${p.hp} จาก ${stats(p).maxHp}` : "ช่องว่าง"}">${p ? `<span class="unit ${p.side === 1 ? "jade" : "gold"}"><span class="symbol">${symbols[p.role]}</span>${p.king ? "<i>♛</i>" : ""}</span><span class="hp"><i style="width:${(100 * p.hp) / stats(p).maxHp}%"></i></span><span class="hptext">${p.hp}</span>${target ? '<span class="target">⚔</span>' : ""}` : highlight ? '<span class="dot"></span>' : ""}</button>`;
+      const skillChoice = skill && highlight;
+      return `<button class="tile ${(r + c) % 2 ? "dark" : ""} ${highlight ? "possible" : ""} ${skillChoice ? "skill-choice" : ""} ${p?.id === selected ? "chosen" : ""}" data-r="${r}" data-c="${c}" aria-label="${String.fromCharCode(65 + c)}${8 - r} ${p ? `${p.side === 1 ? "หยก" : "ทอง"} ${labels[p.role]} เลเวล ${p.level} เลือด ${p.hp} จาก ${stats(p).maxHp}` : "ช่องว่าง"}">${p ? `<span class="unit ${p.side === 1 ? "jade" : "gold"}"><span class="symbol">${symbols[p.role]}</span>${p.king ? "<i>♛</i>" : ""}</span>${p.hp < stats(p).maxHp ? `<span class="hp"><i style="width:${(100 * p.hp) / stats(p).maxHp}%"></i></span><span class="hptext">${p.hp}</span>` : ""}${target ? '<span class="target">⚔</span>' : ""}` : highlight ? '<span class="dot"></span>' : ""}</button>`;
     }).join("");
     if (combatFx) {
       const rect = fallback.getBoundingClientRect();
@@ -180,6 +187,18 @@ function render() {
       (b) => (b.onclick = () => pick(Number(b.dataset.r), Number(b.dataset.c))),
     );
   }
+  const hpLayer = $("#hp-overlays");
+  hpLayer.innerHTML = boardScene
+    ? game.units
+        .filter((p) => p.hp < stats(p).maxHp)
+        .map((p) => {
+          const point = boardScene!.projectPiece(p.id, 0.15);
+          if (!point) return "";
+          const ratio = Math.max(0, Math.min(100, (100 * p.hp) / stats(p).maxHp));
+          return `<span class="hp-float" role="img" style="left:${point.x}px;top:${point.y}px" aria-label="${labels[p.role]} เลือด ${p.hp} จาก ${stats(p).maxHp}"><i style="width:${ratio}%"></i></span>`;
+        })
+        .join("")
+    : "";
   const topSkill = $("#skill-top") as HTMLButtonElement;
   const skillFloat = $("#skill-float") as HTMLDivElement;
   const canUseSkill = !!unit && options.some((a) => a.kind === "skill");
@@ -212,7 +231,9 @@ function render() {
   $("#own-count").textContent =
     `${game.units.filter((x) => x.side === 1).length} ตัว`;
   $("#message").textContent = busy
-    ? "แม่ทัพทองกำลังคิด..."
+    ? game.turn === -1
+      ? "แม่ทัพทองกำลังคิด..."
+      : "แม่ทัพทองกำลังเดิน..."
     : skill
       ? "เลือกเป้าหมายสกิลบนกระดาน"
       : game.log;
@@ -306,27 +327,29 @@ async function perform(action: Action) {
       victimSide: targetBefore.side,
       killed: !game.units.some((x) => x.id === targetBefore.id),
     };
-    busy = true;
-    render();
-    const mark = revision;
-    setTimeout(() => {
-      if (mark !== revision) return;
-      combatFx = null;
-      busy = false;
-      render();
-      queueBot();
-    }, 440);
-    return;
   }
+  busy = true;
   render();
-  queueBot();
+  const mark = revision;
+  void waitForTurnAnimation().then(() => {
+    if (mark !== revision) return;
+    combatFx = null;
+    busy = false;
+    render();
+    queueBot();
+  });
+}
+function waitForTurnAnimation() {
+  if (boardScene) return boardScene.waitForIdle();
+  if (!combatFx) return Promise.resolve();
+  return new Promise<void>((resolve) => setTimeout(resolve, 440));
 }
 function queueBot() {
   if (game.winner !== null || game.turn !== -1) return;
   busy = true;
   render();
   const mark = revision;
-  setTimeout(() => {
+  void waitForTurnAnimation().then(() => {
     if (mark !== revision) return;
     try {
       const a = botAction(game);
@@ -352,26 +375,24 @@ function queueBot() {
           victimSide: target.side,
           killed: !game.units.some((x) => x.id === target.id),
         };
-        render();
-        setTimeout(() => {
-          if (mark !== revision) return;
-          combatFx = null;
-          busy = false;
-          render();
-        }, 440);
-        return;
       }
     } catch (error) {
       console.error("Neo bot turn failed", error);
       game.log = "แม่ทัพทองขัดข้อง · แตะเริ่มเกมใหม่เพื่อลองอีกครั้ง";
+      busy = false;
+      render();
+      return;
     }
-    busy = false;
     render();
-  }, 500);
+    void waitForTurnAnimation().then(() => {
+      if (mark !== revision) return;
+      combatFx = null;
+      busy = false;
+      render();
+    });
+  });
 }
-window.addEventListener("resize", () => {
-  if (selected !== null) render();
-});
+window.addEventListener("resize", () => render());
 render();
 
 
