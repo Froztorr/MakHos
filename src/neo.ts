@@ -27,6 +27,7 @@ let game: Neo = createNeo(
   selected: number | null = null,
   skill = false,
   busy = false,
+  combatFx: { fromR: number; fromC: number; toR: number; toC: number; victim: string; attackerSide: 1 | -1; victimSide: 1 | -1; killed: boolean } | null = null,
   awarded = false,
   revision = 0;
 $("#neo").innerHTML =
@@ -80,6 +81,7 @@ function restart() {
   selected = null;
   skill = false;
   busy = false;
+  combatFx = null;
   awarded = false;
   log = [];
   render();
@@ -109,6 +111,15 @@ function render() {
     const highlight = !!move || !!target;
     return `<button class="tile ${(r + c) % 2 ? "dark" : ""} ${highlight ? "possible" : ""} ${p?.id === selected ? "chosen" : ""}" data-r="${r}" data-c="${c}" aria-label="${String.fromCharCode(65 + c)}${8 - r} ${p ? `${p.side === 1 ? "หยก" : "ทอง"} ${labels[p.role]} เลเวล ${p.level} เลือด ${p.hp} จาก ${stats(p).maxHp}` : "ช่องว่าง"}">${p ? `<span class="unit ${p.side === 1 ? "jade" : "gold"}"><span class="symbol">${symbols[p.role]}</span>${p.king ? "<i>♛</i>" : ""}</span><span class="hp"><i style="width:${(100 * p.hp) / stats(p).maxHp}%"></i></span><span class="hptext">${p.hp}</span>${target ? '<span class="target">⚔</span>' : ""}` : highlight ? '<span class="dot"></span>' : ""}</button>`;
   }).join("");
+  if (combatFx) {
+    const rect = $("#board").getBoundingClientRect();
+    const cell = 100 / 8;
+    const sideClass = combatFx.victimSide === 1 ? "jade" : "gold";
+    const victimPos = `left:${combatFx.toC * cell}%;top:${combatFx.toR * cell}%;`;
+    const attackerPos = `left:${combatFx.fromC * cell}%;top:${combatFx.fromR * cell}%;--dx:${(combatFx.toC - combatFx.fromC) * rect.width / 8}px;--dy:${(combatFx.toR - combatFx.fromR) * rect.height / 8}px;`;
+    const attackerClass = combatFx.attackerSide === 1 ? "jade" : "gold";
+    $("#board").insertAdjacentHTML("beforeend", `<div class="combat-fx" aria-hidden="true"><span class="fx-unit fx-attacker ${attackerClass}" style="${attackerPos}">⚔</span><span class="fx-unit fx-victim ${sideClass} ${combatFx.killed ? "split" : "hit"}" style="${victimPos}">${combatFx.victim}</span><span class="fx-slash" style="${victimPos}">✦</span></div>`);
+  }
   document
     .querySelectorAll<HTMLButtonElement>(".tile")
     .forEach(
@@ -198,26 +209,74 @@ function pick(r: number, c: number) {
 }
 async function perform(action: Action) {
   if (busy) return;
+  const attackerBefore = game.units.find((x) => x.id === action.id)!;
+  const targetBefore = action.target === undefined ? undefined : game.units.find((x) => x.id === action.target);
   game = applyNeo(game, action);
   log.push(game.log);
   selected = null;
   skill = false;
-  render();
-  if (game.winner !== null) return;
-  if (game.turn === -1) {
+  if (targetBefore && targetBefore.side !== attackerBefore.side) {
+    combatFx = {
+      fromR: attackerBefore.r,
+      fromC: attackerBefore.c,
+      toR: targetBefore.r,
+      toC: targetBefore.c,
+      victim: symbols[targetBefore.role],
+      attackerSide: attackerBefore.side,
+      victimSide: targetBefore.side,
+      killed: !game.units.some((x) => x.id === targetBefore.id),
+    };
     busy = true;
     render();
     const mark = revision;
     setTimeout(() => {
       if (mark !== revision) return;
-      const a = botAction(game);
-      if (a) {
-        game = applyNeo(game, a);
-        log.push(game.log);
-      }
+      combatFx = null;
       busy = false;
       render();
-    }, 500);
+      queueBot();
+    }, 440);
+    return;
   }
+  render();
+  queueBot();
+}
+function queueBot() {
+  if (game.winner !== null || game.turn !== -1) return;
+  busy = true;
+  render();
+  const mark = revision;
+  setTimeout(() => {
+    if (mark !== revision) return;
+    const a = botAction(game);
+    if (a) {
+      const attacker = game.units.find((x) => x.id === a.id)!;
+      const target = a.target === undefined ? undefined : game.units.find((x) => x.id === a.target);
+      game = applyNeo(game, a);
+      log.push(game.log);
+      if (target && target.side !== attacker.side) {
+        combatFx = {
+          fromR: attacker.r,
+          fromC: attacker.c,
+          toR: target.r,
+          toC: target.c,
+          victim: symbols[target.role],
+          attackerSide: attacker.side,
+          victimSide: target.side,
+          killed: !game.units.some((x) => x.id === target.id),
+        };
+        render();
+        setTimeout(() => {
+          if (mark !== revision) return;
+          combatFx = null;
+          busy = false;
+          render();
+        }, 440);
+        return;
+      }
+    }
+    busy = false;
+    render();
+  }, 500);
 }
 render();
