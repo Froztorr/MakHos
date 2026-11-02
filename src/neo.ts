@@ -142,7 +142,7 @@ function render() {
             r: a.r,
             c: a.c,
             ...(a.target !== undefined
-              ? { capture: a.target }
+              ? { capture: a.kind === "skill" ? -1 : a.target }
               : skill
                 ? { capture: -1 }
                 : {}),
@@ -150,7 +150,7 @@ function render() {
         ];
       const target = game.units.find((p) => p.id === a.target);
       return target
-        ? [{ id: a.id, r: target.r, c: target.c, capture: a.target ?? -1 }]
+        ? [{ id: a.id, r: target.r, c: target.c, capture: -1 }]
         : [];
     });
     boardScene.update(

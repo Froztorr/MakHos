@@ -345,24 +345,36 @@ export class BoardScene {
     for (const m of this.markers) m.dispose();
     this.markers = [];
     const marker = (r: number, c: number, color: string, full = false) => {
+      const skillChoice = color === "#ff3344";
       const m = MeshBuilder.CreateTorus(
         "marker",
         {
           diameter: full ? 0.85 : 0.3,
-          thickness: full ? 0.055 : 0.09,
+          thickness: skillChoice ? 0.13 : full ? 0.055 : 0.09,
           tessellation: 32,
         },
         this.scene,
       );
       m.position.set(c - 3.5, 0.14, 3.5 - r);
-      m.material = this.mat(color);
+      const material = this.mat(color);
+      if (skillChoice) material.emissiveColor = Color3.FromHexString(color);
+      m.material = material;
       m.metadata = { r, c };
       this.markers.push(m);
     };
     const p = game.pieces.find((p) => p.id === selected);
     if (p) marker(p.r, p.c, "#fff0a8", true);
     for (const m of moves)
-      marker(m.r, m.c, m.capture === undefined ? "#f9e1a2" : "#e58a64");
+      marker(
+        m.r,
+        m.c,
+        m.capture === -1
+          ? "#ff3344"
+          : m.capture === undefined
+            ? "#f9e1a2"
+            : "#e58a64",
+        m.capture === -1,
+      );
     for (const m of this.terrain) m.dispose();
     this.terrain = [];
     for (let i = 0; i < 64; i++) {

@@ -301,9 +301,11 @@ export function botAction(g: Neo): Action | undefined {
   const opts = g.units
     .filter((p) => p.side === g.turn)
     .flatMap((p) => actions(g, p.id));
+  const hasBoardMove = opts.some((a) => a.kind !== "skill");
+  const choices = hasBoardMove ? opts.filter((a) => a.kind !== "skill") : opts;
   let best: Action | undefined,
     score = -Infinity;
-  for (const a of opts) {
+  for (const a of choices) {
     const p = g.units.find((x) => x.id === a.id)!;
     const q = g.units.find((x) => x.id === a.target);
     let v = Math.random() * 2;
@@ -329,4 +331,5 @@ export function botAction(g: Neo): Action | undefined {
   }
   return best;
 }
+
 
